@@ -300,7 +300,7 @@ function LandingPage({ onNavigate, user }) {
     <div style={landingStyles.page}>
       <nav style={{ ...landingStyles.nav, ...(scrolled ? landingStyles.navScrolled : {}) }}>
         <div style={landingStyles.logoWrapper}>
-          <CienahBrain size={48} />
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 48, height: 48, objectFit: "contain" }} />
           <div>
             <div style={landingStyles.logoName}>CIENAH</div>
             <div style={landingStyles.logoSub}>Centro Interdisciplinar Especializado<br />em Neurociência e Atendimento Humanizado</div>
@@ -356,7 +356,7 @@ function LandingPage({ onNavigate, user }) {
 
           <div style={landingStyles.heroVisual}>
             <div style={landingStyles.brainContainer}>
-              <CienahBrain size={420} />
+              <img src="/cienah-logo.png" alt="CIENAH" style={{ width: "100%", maxWidth: 480, height: "auto" }} />
             </div>
           </div>
         </div>
