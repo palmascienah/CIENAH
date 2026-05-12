@@ -1,7 +1,6 @@
 // ============================================================
 // PORTAL CIENAH — App.jsx
-// Versão pronta para produção (localStorage)
-// Cole este arquivo inteiro em src/App.jsx
+// Versão com autenticação Supabase
 // ============================================================
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -15,6 +14,7 @@ import {
   Music as MusicIcon, GraduationCap, Baby, Eye as EyeIcon,
   EyeOff, Menu
 } from "lucide-react";
+import { supabase } from "./supabaseClient";
 
 // ============================================================
 // PALETA CIENAH OFICIAL
@@ -37,18 +37,6 @@ const C = {
   muted: "#6B7A82",
 };
 
-// ============================================================
-// USUÁRIOS DO SISTEMA
-// IMPORTANTE: troque os e-mails e senhas pelos da sua equipe!
-// Em produção real, use Supabase ou Firebase pra autenticação.
-// ============================================================
-const SYSTEM_USERS = [
-  { id: "admin", email: "admin@cienah.com.br", password: "admin123", name: "Administrador", role: "admin", apps: ["acervo", "aba", "laudos"] },
-  { id: "biblio", email: "biblioteca@cienah.com.br", password: "biblio123", name: "Bibliotecário(a)", role: "bibliotecario", apps: ["acervo"] },
-  { id: "terapeuta", email: "terapeuta@cienah.com.br", password: "tera123", name: "Terapeuta", role: "terapeuta", apps: ["aba", "laudos"] },
-  { id: "leitor", email: "leitor@cienah.com.br", password: "leitor123", name: "Visitante", role: "leitor", apps: ["acervo"] },
-];
-
 const ROLE_LABELS = {
   admin: "Administrador",
   bibliotecario: "Bibliotecário(a)",
@@ -64,12 +52,11 @@ const ROLE_PERMISSIONS = {
 };
 
 // ============================================================
-// PERSISTÊNCIA — localStorage
+// PERSISTÊNCIA — localStorage (apenas para dados do Acervo)
 // ============================================================
 const KEYS = {
   PRIVATE: "cienah:portal:private:v1",
   PUBLIC: "cienah:portal:public:v1",
-  SESSION: "cienah:session:v1",
 };
 
 const defaultData = () => ({
@@ -90,25 +77,6 @@ function saveData(data, shared) {
   try {
     const key = shared ? KEYS.PUBLIC : KEYS.PRIVATE;
     localStorage.setItem(key, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(KEYS.SESSION);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(user) {
-  try {
-    if (user) localStorage.setItem(KEYS.SESSION, JSON.stringify(user));
-    else localStorage.removeItem(KEYS.SESSION);
     return true;
   } catch {
     return false;
@@ -156,34 +124,11 @@ async function fetchMetadata(isbn) {
 }
 
 // ============================================================
-// LOGO CIENAH
+// LOGO CIENAH (mantido para uso interno em alguns componentes)
 // ============================================================
 function CienahBrain({ size = 48 }) {
   return (
-    <svg viewBox="0 0 100 90" width={size} height={size * 0.9}>
-      <path d="M15,40 Q10,25 25,20 Q35,18 38,28 Q35,40 28,48 Q18,50 15,40 Z" fill={C.azul} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M38,28 Q35,15 50,12 Q65,15 62,30 Q55,38 45,35 Q38,32 38,28 Z" fill={C.verde} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M62,30 Q72,20 82,28 Q85,40 78,48 Q68,48 62,42 Q58,35 62,30 Z" fill={C.rosa} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M28,48 Q25,60 38,65 Q50,68 58,60 Q60,50 50,45 Q38,42 28,48 Z" fill={C.amarelo} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M15,55 Q10,68 22,75 Q32,76 35,68 Q35,58 28,55 Q18,52 15,55 Z" fill={C.rosa} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M58,60 Q72,58 82,68 Q85,82 70,85 Q55,82 50,72 Q50,62 58,60 Z" fill={C.laranja} stroke={C.azulEscuro} strokeWidth="1.2" />
-      <path d="M22,32 Q26,30 30,32 Q26,35 22,32" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <ellipse cx="46" cy="24" rx="2" ry="1.3" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <ellipse cx="54" cy="24" rx="2" ry="1.3" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <circle cx="46" cy="24" r="0.7" fill={C.azulEscuro} />
-      <circle cx="54" cy="24" r="0.7" fill={C.azulEscuro} />
-      <path d="M68,32 Q72,30 73,33 M70,35 Q74,33 75,37" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <circle cx="44" cy="55" r="2.5" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <circle cx="44" cy="55" r="0.8" fill={C.azulEscuro} />
-      {[0,45,90,135,180,225,270,315].map(a => {
-        const rad = (a * Math.PI) / 180;
-        return <line key={a} x1={44 + Math.cos(rad) * 3} y1={55 + Math.sin(rad) * 3} x2={44 + Math.cos(rad) * 5} y2={55 + Math.sin(rad) * 5} stroke={C.azulEscuro} strokeWidth="0.6" />;
-      })}
-      <path d="M22,62 L22,68 M20,63 L20,67 M24,63 L24,67 M18,64 L18,66" stroke={C.azulEscuro} strokeWidth="0.8" strokeLinecap="round" />
-      <path d="M18,68 Q22,71 26,68 L26,64 Q22,62 18,64 Z" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <path d="M68,68 Q72,65 75,70 Q75,76 70,76 Q67,73 68,68 Z" fill="none" stroke={C.azulEscuro} strokeWidth="0.8" />
-      <path d="M71,72 Q73,71 73,73" fill="none" stroke={C.azulEscuro} strokeWidth="0.6" />
-    </svg>
+    <img src="/cienah-logo.png" alt="CIENAH" style={{ width: size, height: size, objectFit: "contain" }} />
   );
 }
 
@@ -225,26 +170,77 @@ function PatternBg({ opacity = 0.18, dark = false }) {
 export default function App() {
   const [route, setRoute] = useState("home");
   const [user, setUser] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
 
+  // Busca perfil do usuario na tabela profiles
+  const fetchProfile = async (authUser) => {
+    if (!authUser) return null;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", authUser.id)
+      .single();
+    if (error) {
+      console.error("Erro ao buscar perfil:", error);
+      return null;
+    }
+    return data;
+  };
+
+  // Verifica sessao ao carregar o app
   useEffect(() => {
-    const s = loadSession();
-    if (s) setUser(s);
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await fetchProfile(session.user);
+        if (profile) setUser(profile);
+      }
+      setLoadingSession(false);
+    };
+    init();
+
+    // Escuta mudancas de sessao (login, logout, etc)
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user);
+        if (profile) setUser(profile);
+      } else {
+        setUser(null);
+        setRoute("home");
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  const handleLogin = (u) => {
-    setUser(u);
-    saveSession(u);
-    if (u.apps.includes("acervo")) setRoute("acervo");
-    else if (u.apps.includes("aba")) setRoute("aba");
-    else if (u.apps.includes("laudos")) setRoute("laudos");
+  const handleLogin = (profile) => {
+    setUser(profile);
+    if (profile.apps?.includes("acervo")) setRoute("acervo");
+    else if (profile.apps?.includes("aba")) setRoute("aba");
+    else if (profile.apps?.includes("laudos")) setRoute("laudos");
     else setRoute("hub");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    saveSession(null);
     setRoute("home");
   };
+
+  // Tela de carregamento enquanto verifica sessao
+  if (loadingSession) {
+    return (
+      <>
+        <FontAndStyles />
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.offWhite, fontFamily: "'Inter', sans-serif" }}>
+          <div style={{ textAlign: "center" }}>
+            <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 80, height: 80, objectFit: "contain" }} />
+            <div style={{ marginTop: 20, fontSize: 14, color: C.azul, fontWeight: 600 }}>Carregando...</div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -252,9 +248,9 @@ export default function App() {
       {route === "home" && <LandingPage onNavigate={setRoute} user={user} />}
       {route === "login" && <LoginPage onLogin={handleLogin} onBack={() => setRoute("home")} />}
       {route === "hub" && user && <AppHub user={user} onNavigate={setRoute} onLogout={handleLogout} />}
-      {route === "acervo" && user && (user.apps.includes("acervo") ? <AcervoApp user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
-      {route === "aba" && user && (user.apps.includes("aba") ? <PlaceholderApp app="aba" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
-      {route === "laudos" && user && (user.apps.includes("laudos") ? <PlaceholderApp app="laudos" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
+      {route === "acervo" && user && (user.apps?.includes("acervo") ? <AcervoApp user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
+      {route === "aba" && user && (user.apps?.includes("aba") ? <PlaceholderApp app="aba" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
+      {route === "laudos" && user && (user.apps?.includes("laudos") ? <PlaceholderApp app="laudos" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
     </>
   );
 }
@@ -493,7 +489,7 @@ function LandingPage({ onNavigate, user }) {
             </div>
             <div style={landingStyles.contatoItem}>
               <AtSign size={28} color={C.verde} />
-              <div style={{ fontWeight: 700, marginTop: 12, fontSize: 16 }}>AtSign</div>
+              <div style={{ fontWeight: 700, marginTop: 12, fontSize: 16 }}>Instagram</div>
               <div style={{ fontSize: 14, opacity: 0.85, marginTop: 4 }}>@cienahpalmas</div>
             </div>
           </div>
@@ -507,7 +503,7 @@ function LandingPage({ onNavigate, user }) {
         <div style={landingStyles.secaoContainer}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <CienahBrain size={42} />
+              <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 42, height: 42, objectFit: "contain" }} />
               <div>
                 <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 18, fontWeight: 700, color: C.laranja }}>CIENAH</div>
                 <div style={{ fontSize: 11, color: C.textoSuave }}>© 2026 · Todos os direitos reservados</div>
@@ -521,7 +517,7 @@ function LandingPage({ onNavigate, user }) {
 }
 
 // ============================================================
-// LOGIN
+// LOGIN — Agora com Supabase Auth
 // ============================================================
 function LoginPage({ onLogin, onBack }) {
   const [email, setEmail] = useState("");
@@ -530,21 +526,51 @@ function LoginPage({ onLogin, onBack }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setTimeout(() => {
-      const u = SYSTEM_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-      if (u) onLogin(u);
-      else setError("E-mail ou senha incorretos.");
-      setLoading(false);
-    }, 600);
-  };
 
-  const fillDemo = (role) => {
-    const u = SYSTEM_USERS.find(u => u.role === role);
-    if (u) { setEmail(u.email); setPassword(u.password); }
+    try {
+      // 1. Faz login no Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (authError) {
+        if (authError.message.includes("Invalid login credentials")) {
+          setError("E-mail ou senha incorretos.");
+        } else if (authError.message.includes("Email not confirmed")) {
+          setError("E-mail ainda nao confirmado. Verifique sua caixa de entrada.");
+        } else {
+          setError("Erro ao entrar: " + authError.message);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. Busca o perfil na tabela profiles
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        setError("Perfil nao encontrado. Contate o administrador.");
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      // 3. Sucesso — chama callback com o perfil completo
+      onLogin(profile);
+    } catch (err) {
+      console.error("Erro inesperado no login:", err);
+      setError("Erro inesperado. Tente novamente.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -553,7 +579,7 @@ function LoginPage({ onLogin, onBack }) {
         <PatternBg opacity={0.06} dark />
         <button onClick={onBack} style={loginStyles.backBtn}>← Voltar ao site</button>
         <div style={loginStyles.leftContent}>
-          <CienahBrain size={90} />
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 120, height: 120, objectFit: "contain" }} />
           <h1 style={loginStyles.leftTitle}>Portal CIENAH</h1>
           <p style={loginStyles.leftSub}>Sistema integrado para gestão clínica e administrativa</p>
           <div style={loginStyles.leftFeatures}>
@@ -575,12 +601,12 @@ function LoginPage({ onLogin, onBack }) {
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
               <label style={loginStyles.label}>E-mail</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={loginStyles.input} placeholder="seu@cienah.com.br" required />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={loginStyles.input} placeholder="seu@cienah.com.br" required autoComplete="email" />
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={loginStyles.label}>Senha</label>
               <div style={{ position: "relative" }}>
-                <input type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...loginStyles.input, paddingRight: 44 }} placeholder="••••••••" required />
+                <input type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...loginStyles.input, paddingRight: 44 }} placeholder="••••••••" required autoComplete="current-password" />
                 <button type="button" onClick={() => setShowPwd(!showPwd)} style={loginStyles.eyeBtn}>
                   {showPwd ? <EyeOff size={16} /> : <EyeIcon size={16} />}
                 </button>
@@ -594,14 +620,10 @@ function LoginPage({ onLogin, onBack }) {
             </button>
           </form>
 
-          <div style={loginStyles.demoBox}>
-            <div style={{ fontSize: 11, color: C.textoSuave, marginBottom: 8, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Acesso de demonstração</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <button onClick={() => fillDemo("admin")} style={loginStyles.demoBtn}>👤 Admin</button>
-              <button onClick={() => fillDemo("bibliotecario")} style={loginStyles.demoBtn}>📚 Bibliotecário</button>
-              <button onClick={() => fillDemo("terapeuta")} style={loginStyles.demoBtn}>🧠 Terapeuta</button>
-              <button onClick={() => fillDemo("leitor")} style={loginStyles.demoBtn}>👁 Leitor</button>
-            </div>
+          <div style={{ marginTop: 24, padding: 14, background: C.creamLight, borderRadius: 10, fontSize: 12, color: C.textoSuave, textAlign: "center", lineHeight: 1.5 }}>
+            <Lock size={14} style={{ verticalAlign: "middle", marginRight: 6, color: C.azul }} />
+            Acesso restrito à equipe CIENAH.<br />
+            Esqueceu a senha? Entre em contato com o administrador.
           </div>
         </div>
       </div>
@@ -618,13 +640,13 @@ function AppHub({ user, onNavigate, onLogout }) {
     { id: "aba", title: "CIENAH ABA", desc: "Sistema de aplicação e registro de programas ABA para terapia", icon: Brain, color: C.rosa, status: "em-breve" },
     { id: "laudos", title: "Produção de Laudos", desc: "Geração e gestão de PAC e AVN — relatórios psicopedagógicos e neuropsicológicos", icon: FileCheck, color: C.verde, status: "em-breve" },
   ];
-  const userApps = apps.filter(a => user.apps.includes(a.id));
+  const userApps = apps.filter(a => user.apps?.includes(a.id));
 
   return (
     <div style={hubStyles.page}>
       <header style={hubStyles.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <CienahBrain size={44} />
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 44, height: 44, objectFit: "contain" }} />
           <div>
             <div style={hubStyles.headerKicker}>Portal CIENAH</div>
             <div style={hubStyles.headerTitle}>Bem-vindo(a), {user.name.split(" ")[0]}</div>
@@ -695,7 +717,7 @@ function PlaceholderApp({ app, user, onLogout, onHub }) {
       <header style={hubStyles.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <button onClick={onHub} style={placeholderStyles.backBtn}>← Hub</button>
-          <CienahBrain size={36} />
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 36, height: 36, objectFit: "contain" }} />
           <div>
             <div style={{ fontSize: 11, letterSpacing: 2, color, fontWeight: 700 }}>APLICATIVO</div>
             <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 18, fontWeight: 700, color: C.azul }}>{title}</div>
@@ -828,7 +850,9 @@ function Sidebar({ view, setView, scope, setScope, user, onHub, onLogout }) {
     <aside style={acervoStyles.sidebar}>
       <PatternBg opacity={0.04} dark />
       <div style={acervoStyles.brand}>
-        <div style={acervoStyles.brandMark}><CienahBrain size={38} /></div>
+        <div style={acervoStyles.brandMark}>
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 38, height: 38, objectFit: "contain" }} />
+        </div>
         <div>
           <div style={acervoStyles.brandTitle}>Acervo</div>
           <div style={acervoStyles.brandSub}>CIENAH</div>
@@ -1614,8 +1638,6 @@ const loginStyles = {
   eyeBtn: { position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: C.muted, padding: 4 },
   error: { padding: "10px 14px", background: C.rosa + "15", color: C.rosa, borderRadius: 10, fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, fontWeight: 600 },
   submitBtn: { width: "100%", padding: "14px 20px", background: C.laranja, color: "white", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Fredoka', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  demoBox: { marginTop: 32, padding: 16, background: C.offWhite, borderRadius: 12 },
-  demoBtn: { padding: "6px 12px", background: "white", border: `1px solid ${C.border}`, borderRadius: 100, cursor: "pointer", fontSize: 11.5, fontWeight: 600, color: C.texto },
 };
 
 const hubStyles = {
