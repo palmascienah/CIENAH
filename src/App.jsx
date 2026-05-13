@@ -1,6 +1,6 @@
 // ============================================================
 // PORTAL CIENAH — App.jsx
-// Versao com autenticacao Supabase + Gerenciamento de Equipe
+// Versão MIGRADA: Supabase como fonte única de dados (SSOT)
 // ============================================================
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -73,41 +73,8 @@ const AVAILABLE_APPS = [
 ];
 
 // ============================================================
-// PERSISTÊNCIA — localStorage (apenas dados do Acervo)
-// ============================================================
-const KEYS = {
-  PRIVATE: "cienah:portal:private:v1",
-  PUBLIC: "cienah:portal:public:v1",
-};
-
-const defaultData = () => ({
-  items: [], users: [], loans: [], reservations: [],
-});
-
-function loadData(shared) {
-  try {
-    const key = shared ? KEYS.PUBLIC : KEYS.PRIVATE;
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : defaultData();
-  } catch {
-    return defaultData();
-  }
-}
-
-function saveData(data, shared) {
-  try {
-    const key = shared ? KEYS.PUBLIC : KEYS.PRIVATE;
-    localStorage.setItem(key, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ============================================================
 // HELPERS
 // ============================================================
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (d, n) => {
   const x = new Date(d);
@@ -127,11 +94,6 @@ const MEDIA_TYPES = [
   { id: "stationery",  label: "Papelaria",              icon: Pencil,      color: C.rosa },
   { id: "causeeffect", label: "Causa e Efeito",         icon: Zap,         color: C.laranja },
   { id: "other",       label: "Outros",                 icon: Package,     color: C.muted || "#999" },
-  // Tipos antigos removidos (filme, música, videogame).
-  // Se ainda tiver itens cadastrados com esses tipos, descomenta as 3 linhas abaixo:
-  // { id: "movie",     label: "Filme",     icon: Film,     color: C.rosa },
-  // { id: "music",     label: "Música",    icon: Music,    color: C.laranja },
-  // { id: "videogame", label: "Videogame", icon: Gamepad2, color: C.amarelo },
 ];
 
 const mediaInfo = (t) => MEDIA_TYPES.find(m => m.id === t) || MEDIA_TYPES[0];
@@ -174,6 +136,63 @@ async function callEdgeFunction(functionName, body) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Erro desconhecido");
   return data;
+}
+
+// ============================================================
+// SUPABASE DATA HELPERS — Acervo
+// ============================================================
+// Converte do formato do banco (snake_case) pro formato do app (camelCase)
+function itemFromDb(row) {
+  return {
+    id: row.id,
+    code: row.code || "",
+    title: row.title,
+    type: row.type || "other",
+    author: row.author || "",
+    year: row.year || "",
+    publisher: row.publisher || "",
+    location: row.location || "",
+    quantity: row.quantity || 1,
+    pieces: row.pieces || "",
+    notes: row.notes || "",
+    tags: row.tags || [],
+    available: row.available !== false,
+    completed: row.completed || false,
+    createdAt: row.created_at,
+  };
+}
+
+function readerFromDb(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email || "",
+    phone: row.phone || "",
+    role: row.category || "Aluno",
+    createdAt: row.created_at,
+  };
+}
+
+function loanFromDb(row) {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    userId: row.reader_id,
+    loanDate: row.loan_date,
+    dueDate: row.due_date,
+    returnDate: row.return_date,
+    registeredBy: row.registered_by || "",
+  };
+}
+
+function reservationFromDb(row) {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    userId: row.reader_id,
+    date: row.reservation_date,
+    status: row.status || "ativa",
+  };
 }
 
 // ============================================================
@@ -304,7 +323,6 @@ export default function App() {
     </>
   );
 }
-
 // ============================================================
 // LANDING PAGE
 // ============================================================
@@ -756,7 +774,7 @@ function AppHub({ user, onNavigate, onLogout }) {
 }
 
 // ============================================================
-// TEAM MANAGER - NOVA TELA DE GERENCIAMENTO DE EQUIPE
+// TEAM MANAGER (mantido igual ao seu)
 // ============================================================
 function TeamManager({ user, onLogout, onHub }) {
   const [profiles, setProfiles] = useState([]);
@@ -852,7 +870,6 @@ function TeamManager({ user, onLogout, onHub }) {
       </header>
 
       <main style={teamStyles.main}>
-        {/* Stats */}
         <div style={teamStyles.statsGrid}>
           <StatMini label="Total" value={stats.total} icon={Users} color={C.azul} />
           <StatMini label="Administradores" value={stats.admin} icon={Crown} color={C.laranja} />
@@ -861,7 +878,6 @@ function TeamManager({ user, onLogout, onHub }) {
           <StatMini label="Leitores" value={stats.leitor} icon={EyeIcon} color={C.verde} />
         </div>
 
-        {/* Toolbar */}
         <div style={teamStyles.toolbar}>
           <div style={teamStyles.searchBox}>
             <Search size={15} color={C.muted} />
@@ -884,7 +900,6 @@ function TeamManager({ user, onLogout, onHub }) {
           </button>
         </div>
 
-        {/* Lista */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 60, color: C.muted }}>Carregando equipe...</div>
         ) : filtered.length === 0 ? (
@@ -1055,29 +1070,12 @@ function UserFormModal({ title, initial, onClose, onSave, mode }) {
   };
 
   const handleSubmit = async () => {
-    console.log("🔵 [DEBUG] handleSubmit iniciado");
-    console.log("🔵 [DEBUG] form atual:", form);
-    console.log("🔵 [DEBUG] mode:", mode);
-    
     setError("");
 
-    if (!form.name.trim()) { 
-      console.log("❌ [DEBUG] Nome vazio");
-      setError("Nome é obrigatório"); 
-      return; 
-    }
-    if (mode === "create" && !form.email.trim()) { 
-      console.log("❌ [DEBUG] Email vazio");
-      setError("E-mail é obrigatório"); 
-      return; 
-    }
-    if (mode === "create" && form.password.length < 12) { 
-      console.log("❌ [DEBUG] Senha curta:", form.password.length, "chars");
-      setError("Senha deve ter pelo menos 12 caracteres"); 
-      return; 
-    }
+    if (!form.name.trim()) { setError("Nome é obrigatório"); return; }
+    if (mode === "create" && !form.email.trim()) { setError("E-mail é obrigatório"); return; }
+    if (mode === "create" && form.password.length < 12) { setError("Senha deve ter pelo menos 12 caracteres"); return; }
 
-    console.log("✅ [DEBUG] Validações passaram, chamando onSave...");
     setSaving(true);
     try {
       const payload = mode === "create" ? {
@@ -1091,12 +1089,8 @@ function UserFormModal({ title, initial, onClose, onSave, mode }) {
         role: form.role,
         apps: form.apps,
       };
-      console.log("🔵 [DEBUG] Payload:", payload);
-      
       await onSave(payload);
-      console.log("✅ [DEBUG] onSave completou com sucesso");
     } catch (err) {
-      console.log("❌ [DEBUG] Erro em onSave:", err);
       setError(err.message);
       setSaving(false);
     }
@@ -1228,7 +1222,7 @@ function UserFormModal({ title, initial, onClose, onSave, mode }) {
 }
 
 // ============================================================
-// PLACEHOLDER PARA APPS FUTUROS
+// PLACEHOLDER + NO ACCESS
 // ============================================================
 function PlaceholderApp({ app, user, onLogout, onHub }) {
   const config = {
@@ -1286,59 +1280,298 @@ function NoAccess({ onBack }) {
     </div>
   );
 }
-
 // ============================================================
-// APP DO ACERVO
+// APP DO ACERVO — MIGRADO PARA SUPABASE
 // ============================================================
 function AcervoApp({ user, onLogout, onHub }) {
-  const [scope, setScope] = useState("public");
-  const [data, setData] = useState(defaultData());
+  const [scope, setScope] = useState("public"); // visual apenas - sempre carrega do Supabase
+  const [data, setData] = useState({ items: [], users: [], loans: [], reservations: [] });
   const [view, setView] = useState("dashboard");
   const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(true);
   const perms = ROLE_PERMISSIONS[user.role];
-
-  useEffect(() => {
-    setData(loadData(scope === "public"));
-  }, [scope]);
-
-  const persist = (next) => {
-    setData(next);
-    if (!saveData(next, scope === "public")) showToast("Erro ao salvar", "error");
-  };
 
   const showToast = (msg, type = "ok") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2200);
   };
 
-  const addItem = (item) => { persist({ ...data, items: [...data.items, { ...item, id: uid(), createdAt: today(), createdBy: user.name }] }); showToast("Item catalogado"); };
-  const updateItem = (id, patch) => persist({ ...data, items: data.items.map(i => i.id === id ? { ...i, ...patch } : i) });
-  const deleteItem = (id) => { persist({ ...data, items: data.items.filter(i => i.id !== id), loans: data.loans.filter(l => l.itemId !== id), reservations: data.reservations.filter(r => r.itemId !== id) }); showToast("Item removido"); };
-  const addUser = (u) => { persist({ ...data, users: [...data.users, { ...u, id: uid(), createdAt: today() }] }); showToast("Leitor cadastrado"); };
-  const deleteUser = (id) => persist({ ...data, users: data.users.filter(u => u.id !== id) });
-  const createLoan = (itemId, userId, days = 14) => { persist({ ...data, loans: [...data.loans, { id: uid(), itemId, userId, loanDate: today(), dueDate: addDays(today(), days), returnDate: null, registeredBy: user.name }] }); showToast("Empréstimo registrado"); };
-  const returnLoan = (id) => { persist({ ...data, loans: data.loans.map(l => l.id === id ? { ...l, returnDate: today() } : l) }); showToast("Devolução confirmada"); };
-  const createReservation = (itemId, userId) => { persist({ ...data, reservations: [...data.reservations, { id: uid(), itemId, userId, date: today(), status: "ativa" }] }); showToast("Reserva criada"); };
-  const cancelReservation = (id) => persist({ ...data, reservations: data.reservations.filter(r => r.id !== id) });
+  // ============================================================
+  // CARREGA TUDO DO SUPABASE
+  // ============================================================
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const [itemsRes, readersRes, loansRes, reservationsRes] = await Promise.all([
+        supabase.from("items").select("*").order("created_at", { ascending: false }),
+        supabase.from("readers").select("*").order("created_at", { ascending: false }),
+        supabase.from("loans").select("*").order("created_at", { ascending: false }),
+        supabase.from("reservations").select("*").order("created_at", { ascending: false }),
+      ]);
 
+      if (itemsRes.error) throw itemsRes.error;
+      if (readersRes.error) throw readersRes.error;
+      if (loansRes.error) throw loansRes.error;
+      if (reservationsRes.error) throw reservationsRes.error;
+
+      setData({
+        items: (itemsRes.data || []).map(itemFromDb),
+        users: (readersRes.data || []).map(readerFromDb),
+        loans: (loansRes.data || []).map(loanFromDb),
+        reservations: (reservationsRes.data || []).map(reservationFromDb),
+      });
+    } catch (err) {
+      console.error("Erro ao carregar:", err);
+      showToast("Erro ao carregar dados: " + err.message, "error");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  // ============================================================
+  // ITEMS — CRUD via Supabase
+  // ============================================================
+  const addItem = async (item) => {
+    try {
+      const { data: inserted, error } = await supabase
+        .from("items")
+        .insert([{
+          code: item.code || null,
+          title: item.title,
+          type: item.type || "other",
+          author: item.author || "",
+          year: item.year ? parseInt(item.year) : null,
+          publisher: item.publisher || "",
+          location: item.location || "",
+          quantity: item.quantity || 1,
+          pieces: item.pieces || "",
+          notes: item.notes || "",
+          tags: item.tags || [],
+          available: item.available !== false,
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      setData(d => ({ ...d, items: [itemFromDb(inserted), ...d.items] }));
+      showToast("Item catalogado");
+    } catch (err) {
+      showToast("Erro ao catalogar: " + err.message, "error");
+    }
+  };
+
+  const updateItem = async (id, patch) => {
+    try {
+      const dbPatch = {};
+      if (patch.code !== undefined) dbPatch.code = patch.code;
+      if (patch.title !== undefined) dbPatch.title = patch.title;
+      if (patch.type !== undefined) dbPatch.type = patch.type;
+      if (patch.author !== undefined) dbPatch.author = patch.author;
+      if (patch.year !== undefined) dbPatch.year = patch.year ? parseInt(patch.year) : null;
+      if (patch.publisher !== undefined) dbPatch.publisher = patch.publisher;
+      if (patch.location !== undefined) dbPatch.location = patch.location;
+      if (patch.quantity !== undefined) dbPatch.quantity = patch.quantity;
+      if (patch.pieces !== undefined) dbPatch.pieces = patch.pieces;
+      if (patch.notes !== undefined) dbPatch.notes = patch.notes;
+      if (patch.tags !== undefined) dbPatch.tags = patch.tags;
+      if (patch.available !== undefined) dbPatch.available = patch.available;
+      if (patch.completed !== undefined) dbPatch.completed = patch.completed;
+
+      const { data: updated, error } = await supabase
+        .from("items").update(dbPatch).eq("id", id).select().single();
+      if (error) throw error;
+      setData(d => ({ ...d, items: d.items.map(i => i.id === id ? itemFromDb(updated) : i) }));
+    } catch (err) {
+      showToast("Erro ao atualizar: " + err.message, "error");
+    }
+  };
+
+  const deleteItem = async (id) => {
+    try {
+      const { error } = await supabase.from("items").delete().eq("id", id);
+      if (error) throw error;
+      setData(d => ({
+        ...d,
+        items: d.items.filter(i => i.id !== id),
+        loans: d.loans.filter(l => l.itemId !== id),
+        reservations: d.reservations.filter(r => r.itemId !== id),
+      }));
+      showToast("Item removido");
+    } catch (err) {
+      showToast("Erro ao remover: " + err.message, "error");
+    }
+  };
+
+  // ============================================================
+  // READERS (LEITORES) — CRUD via Supabase
+  // ============================================================
+  const addUser = async (u) => {
+    try {
+      const { data: inserted, error } = await supabase
+        .from("readers")
+        .insert([{
+          name: u.name,
+          email: u.email || "",
+          phone: u.phone || "",
+          category: u.role || "Aluno",
+        }])
+        .select().single();
+      if (error) throw error;
+      setData(d => ({ ...d, users: [readerFromDb(inserted), ...d.users] }));
+      showToast("Leitor cadastrado");
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const deleteUser = async (id) => {
+    try {
+      const { error } = await supabase.from("readers").delete().eq("id", id);
+      if (error) throw error;
+      setData(d => ({ ...d, users: d.users.filter(u => u.id !== id) }));
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  // ============================================================
+  // LOANS (EMPRÉSTIMOS) — CRUD via Supabase
+  // ============================================================
+  const createLoan = async (itemId, userId, days = 14) => {
+    try {
+      const { data: inserted, error } = await supabase
+        .from("loans")
+        .insert([{
+          item_id: itemId,
+          reader_id: userId,
+          loan_date: today(),
+          due_date: addDays(today(), days),
+          registered_by: user.name,
+        }])
+        .select().single();
+      if (error) throw error;
+      setData(d => ({ ...d, loans: [loanFromDb(inserted), ...d.loans] }));
+      showToast("Empréstimo registrado");
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const returnLoan = async (id) => {
+    try {
+      const { data: updated, error } = await supabase
+        .from("loans").update({ return_date: today() }).eq("id", id).select().single();
+      if (error) throw error;
+      setData(d => ({ ...d, loans: d.loans.map(l => l.id === id ? loanFromDb(updated) : l) }));
+      showToast("Devolução confirmada");
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  // ============================================================
+  // RESERVATIONS (RESERVAS) — CRUD via Supabase
+  // ============================================================
+  const createReservation = async (itemId, userId) => {
+    try {
+      const { data: inserted, error } = await supabase
+        .from("reservations")
+        .insert([{ item_id: itemId, reader_id: userId, reservation_date: today(), status: "ativa" }])
+        .select().single();
+      if (error) throw error;
+      setData(d => ({ ...d, reservations: [reservationFromDb(inserted), ...d.reservations] }));
+      showToast("Reserva criada");
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const cancelReservation = async (id) => {
+    try {
+      const { error } = await supabase.from("reservations").delete().eq("id", id);
+      if (error) throw error;
+      setData(d => ({ ...d, reservations: d.reservations.filter(r => r.id !== id) }));
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  // ============================================================
+  // EXPORT / IMPORT — agora trabalham com Supabase
+  // ============================================================
   const exportJSON = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `acervo-${scope}-${today()}.json`;
+    a.href = url; a.download = `acervo-cienah-${today()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast("Exportado");
   };
+
   const importJSON = (file) => {
     if (!perms.canEdit) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      try { persist({ ...defaultData(), ...JSON.parse(e.target.result) }); showToast("Importado"); }
-      catch { showToast("Arquivo inválido", "error"); }
+    reader.onload = async (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        const itemsToImport = parsed.items || [];
+        if (itemsToImport.length === 0) {
+          showToast("Arquivo sem itens válidos", "error");
+          return;
+        }
+
+        showToast(`Importando ${itemsToImport.length} itens...`);
+
+        // Importa em lotes de 50 pra não sobrecarregar a API
+        const batchSize = 50;
+        let imported = 0;
+        for (let i = 0; i < itemsToImport.length; i += batchSize) {
+          const batch = itemsToImport.slice(i, i + batchSize).map(it => ({
+            code: it.code || null,
+            title: it.title,
+            type: it.type || "other",
+            author: it.author || "",
+            year: it.year ? parseInt(it.year) : null,
+            publisher: it.publisher || "",
+            location: it.location || "",
+            quantity: it.quantity || 1,
+            pieces: it.pieces || "",
+            notes: it.notes || "",
+            tags: it.tags || [],
+            available: it.available !== false,
+          }));
+          const { error } = await supabase.from("items").insert(batch);
+          if (error) {
+            console.error("Erro no lote:", error);
+            showToast(`Erro no lote ${i / batchSize + 1}: ${error.message}`, "error");
+            break;
+          }
+          imported += batch.length;
+        }
+
+        showToast(`${imported} itens importados!`);
+        await loadAll(); // recarrega tudo
+      } catch (err) {
+        console.error(err);
+        showToast("Arquivo inválido: " + err.message, "error");
+      }
     };
     reader.readAsText(file);
   };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.offWhite }}>
+        <div style={{ textAlign: "center" }}>
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 64, height: 64, objectFit: "contain" }} />
+          <div style={{ marginTop: 16, fontSize: 14, color: C.azul, fontWeight: 600 }}>Carregando acervo...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={acervoStyles.app}>
@@ -1362,6 +1595,9 @@ function AcervoApp({ user, onLogout, onHub }) {
   );
 }
 
+// ============================================================
+// SIDEBAR, HEADER, DASHBOARD, CATALOG (mantidos iguais)
+// ============================================================
 function Sidebar({ view, setView, scope, setScope, user, onHub, onLogout }) {
   const items = [
     { id: "dashboard", label: "Painel", icon: BarChart3 },
@@ -1399,11 +1635,8 @@ function Sidebar({ view, setView, scope, setScope, user, onHub, onLogout }) {
       <div style={acervoStyles.bottomBox}>
         <div style={{ fontSize: 10, letterSpacing: 1.5, color: "rgba(245,241,232,0.6)", textTransform: "uppercase", marginBottom: 8, fontWeight: 600 }}>Coleção</div>
         <div style={acervoStyles.scopeToggle}>
-          <button onClick={() => setScope("private")} style={{ ...acervoStyles.scopeBtn, ...(scope === "private" ? acervoStyles.scopeBtnActive : {}) }}>
-            <Lock size={11} /> Privada
-          </button>
-          <button onClick={() => setScope("public")} style={{ ...acervoStyles.scopeBtn, ...(scope === "public" ? acervoStyles.scopeBtnActive : {}) }}>
-            <Globe size={11} /> Equipe
+          <button onClick={() => setScope("public")} style={{ ...acervoStyles.scopeBtn, ...acervoStyles.scopeBtnActive }}>
+            <Globe size={11} /> Equipe (compartilhada)
           </button>
         </div>
         <div style={acervoStyles.userBox}>
@@ -1437,7 +1670,7 @@ function Header({ data, scope, onExport, onImport, view, perms }) {
     <header style={acervoStyles.header}>
       <div>
         <div style={acervoStyles.headerKicker}>
-          <Sparkles size={11} /> {t.kicker} · {scope === "private" ? "Privado" : "Equipe"}
+          <Sparkles size={11} /> {t.kicker} · Equipe
         </div>
         <h1 style={acervoStyles.headerTitle}>{t.title}</h1>
       </div>
@@ -1628,6 +1861,7 @@ function ItemCard({ item, perms, loaned, onEdit, onDelete, onLoan, onToggleCompl
         <div style={acervoStyles.itemMeta}>
           {item.year && <span>{item.year}</span>}
           {item.publisher && <span>{item.year ? " · " : ""}{item.publisher}</span>}
+          {item.location && <span>{(item.year || item.publisher) ? " · " : ""}📍 {item.location}</span>}
         </div>
         {item.code && <div style={acervoStyles.itemCode}><Hash size={10} /> {item.code}</div>}
         {item.notes && <div style={acervoStyles.itemNotes}>"{item.notes}"</div>}
@@ -1658,7 +1892,7 @@ function ItemCard({ item, perms, loaned, onEdit, onDelete, onLoan, onToggleCompl
 }
 
 function ItemForm({ initial, onClose, onSave }) {
-  const [form, setForm] = useState(initial || { type: "book", title: "", author: "", year: "", publisher: "", code: "", notes: "", tags: [], completed: false });
+  const [form, setForm] = useState(initial || { type: "book", title: "", author: "", year: "", publisher: "", code: "", location: "", notes: "", tags: [], completed: false });
   const [tagInput, setTagInput] = useState("");
   const [scanning, setScanning] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -1705,6 +1939,9 @@ function ItemForm({ initial, onClose, onSave }) {
         </Field>
         <Field label="Editora" full>
           <input value={form.publisher} onChange={(e) => set("publisher", e.target.value)} style={acervoStyles.input} />
+        </Field>
+        <Field label="Localização (sala)" full>
+          <input value={form.location} onChange={(e) => set("location", e.target.value)} style={acervoStyles.input} placeholder="Ex: Aba Estefanny, Lioneide..." />
         </Field>
         <Field label="Notas" full>
           <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} style={{ ...acervoStyles.input, minHeight: 60, resize: "vertical" }} />
@@ -2084,7 +2321,7 @@ function FontAndStyles() {
 }
 
 // ============================================================
-// ESTILOS
+// ESTILOS (idênticos ao seu)
 // ============================================================
 const landingStyles = {
   page: { background: C.offWhite, minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: C.texto, lineHeight: 1.6 },
