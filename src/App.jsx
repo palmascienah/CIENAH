@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   BookOpen, Users, BarChart3, Tag, Search, Plus, Download, Upload,
+  Layers, Puzzle, ToyBrick, Copy, Pencil, Zap,
   Scan, Trash2, Edit3, X, Check, Clock, AlertCircle, Library,
   Film, Music, Gamepad2, Dice5, Globe, Lock, FileText,
   ChevronRight, Calendar, User, Hash, LogOut, Brain, Heart,
@@ -116,11 +117,21 @@ const addDays = (d, n) => {
 const fmt = (d) => d ? new Date(d + "T00:00").toLocaleDateString("pt-BR") : "—";
 
 const MEDIA_TYPES = [
-  { id: "book", label: "Livro", icon: BookOpen, color: C.azul },
-  { id: "boardgame", label: "Jogo de Tabuleiro", icon: Dice5, color: C.verde },
-  { id: "movie", label: "Filme", icon: Film, color: C.rosa },
-  { id: "music", label: "Música", icon: Music, color: C.laranja },
-  { id: "videogame", label: "Videogame", icon: Gamepad2, color: C.amarelo },
+  { id: "book",        label: "Livro",                  icon: BookOpen,    color: C.azul },
+  { id: "boardgame",   label: "Jogo de Tabuleiro",      icon: Dice5,       color: C.verde },
+  { id: "cards",       label: "Cartas",                 icon: Layers,      color: C.rosa },
+  { id: "puzzle",      label: "Encaixes/Quebra-cabeça", icon: Puzzle,      color: C.laranja },
+  { id: "toy",         label: "Lúdico/Brinquedo",       icon: ToyBrick,    color: C.amarelo },
+  { id: "pairing",     label: "Pareamento",             icon: Copy,        color: C.verde },
+  { id: "instrument",  label: "Instrumento Musical",    icon: Music,       color: C.azul },
+  { id: "stationery",  label: "Papelaria",              icon: Pencil,      color: C.rosa },
+  { id: "causeeffect", label: "Causa e Efeito",         icon: Zap,         color: C.laranja },
+  { id: "other",       label: "Outros",                 icon: Package,     color: C.muted || "#999" },
+  // Tipos antigos removidos (filme, música, videogame).
+  // Se ainda tiver itens cadastrados com esses tipos, descomenta as 3 linhas abaixo:
+  // { id: "movie",     label: "Filme",     icon: Film,     color: C.rosa },
+  // { id: "music",     label: "Música",    icon: Music,    color: C.laranja },
+  // { id: "videogame", label: "Videogame", icon: Gamepad2, color: C.amarelo },
 ];
 
 const mediaInfo = (t) => MEDIA_TYPES.find(m => m.id === t) || MEDIA_TYPES[0];
