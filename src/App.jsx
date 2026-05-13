@@ -1,6 +1,6 @@
 // ============================================================
 // PORTAL CIENAH — App.jsx
-// Versão com autenticação Supabase
+// Versao com autenticacao Supabase + Gerenciamento de Equipe
 // ============================================================
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -12,7 +12,7 @@ import {
   Sparkles, Shield, Package, FileCheck, ArrowRight, MapPin,
   Phone, Mail, AtSign, Stethoscope, MessageCircle, Hand,
   Music as MusicIcon, GraduationCap, Baby, Eye as EyeIcon,
-  EyeOff, Menu
+  EyeOff, Menu, UserPlus, UserCog, MoreVertical, Crown
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -44,6 +44,20 @@ const ROLE_LABELS = {
   leitor: "Leitor",
 };
 
+const ROLE_ICONS = {
+  admin: Crown,
+  bibliotecario: BookOpen,
+  terapeuta: Brain,
+  leitor: EyeIcon,
+};
+
+const ROLE_COLORS = {
+  admin: C.laranja,
+  bibliotecario: C.azul,
+  terapeuta: C.rosa,
+  leitor: C.verde,
+};
+
 const ROLE_PERMISSIONS = {
   admin: { canEdit: true, canDelete: true, canManageUsers: true, canLoan: true },
   bibliotecario: { canEdit: true, canDelete: true, canManageUsers: true, canLoan: true },
@@ -51,8 +65,14 @@ const ROLE_PERMISSIONS = {
   leitor: { canEdit: false, canDelete: false, canManageUsers: false, canLoan: false },
 };
 
+const AVAILABLE_APPS = [
+  { id: "acervo", label: "Acervo Bibliográfico", icon: BookOpen, color: C.azul },
+  { id: "aba", label: "CIENAH ABA", icon: Brain, color: C.rosa },
+  { id: "laudos", label: "Produção de Laudos", icon: FileCheck, color: C.verde },
+];
+
 // ============================================================
-// PERSISTÊNCIA — localStorage (apenas para dados do Acervo)
+// PERSISTÊNCIA — localStorage (apenas dados do Acervo)
 // ============================================================
 const KEYS = {
   PRIVATE: "cienah:portal:private:v1",
@@ -105,7 +125,6 @@ const MEDIA_TYPES = [
 
 const mediaInfo = (t) => MEDIA_TYPES.find(m => m.id === t) || MEDIA_TYPES[0];
 
-// Busca metadados pelo ISBN via Open Library
 async function fetchMetadata(isbn) {
   try {
     const r = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
@@ -124,7 +143,30 @@ async function fetchMetadata(isbn) {
 }
 
 // ============================================================
-// LOGO CIENAH (mantido para uso interno em alguns componentes)
+// EDGE FUNCTIONS - Helpers para chamar
+// ============================================================
+async function callEdgeFunction(functionName, body) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Nao autenticado");
+
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Erro desconhecido");
+  return data;
+}
+
+// ============================================================
+// LOGO CIENAH
 // ============================================================
 function CienahBrain({ size = 48 }) {
   return (
@@ -172,7 +214,6 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
 
-  // Busca perfil do usuario na tabela profiles
   const fetchProfile = async (authUser) => {
     if (!authUser) return null;
     const { data, error } = await supabase
@@ -187,7 +228,6 @@ export default function App() {
     return data;
   };
 
-  // Verifica sessao ao carregar o app
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -199,7 +239,6 @@ export default function App() {
     };
     init();
 
-    // Escuta mudancas de sessao (login, logout, etc)
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user);
@@ -227,7 +266,6 @@ export default function App() {
     setRoute("home");
   };
 
-  // Tela de carregamento enquanto verifica sessao
   if (loadingSession) {
     return (
       <>
@@ -248,6 +286,7 @@ export default function App() {
       {route === "home" && <LandingPage onNavigate={setRoute} user={user} />}
       {route === "login" && <LoginPage onLogin={handleLogin} onBack={() => setRoute("home")} />}
       {route === "hub" && user && <AppHub user={user} onNavigate={setRoute} onLogout={handleLogout} />}
+      {route === "equipe" && user && user.role === "admin" && <TeamManager user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} />}
       {route === "acervo" && user && (user.apps?.includes("acervo") ? <AcervoApp user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
       {route === "aba" && user && (user.apps?.includes("aba") ? <PlaceholderApp app="aba" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
       {route === "laudos" && user && (user.apps?.includes("laudos") ? <PlaceholderApp app="laudos" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
@@ -517,7 +556,7 @@ function LandingPage({ onNavigate, user }) {
 }
 
 // ============================================================
-// LOGIN — Agora com Supabase Auth
+// LOGIN
 // ============================================================
 function LoginPage({ onLogin, onBack }) {
   const [email, setEmail] = useState("");
@@ -532,7 +571,6 @@ function LoginPage({ onLogin, onBack }) {
     setError("");
 
     try {
-      // 1. Faz login no Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: password,
@@ -550,7 +588,6 @@ function LoginPage({ onLogin, onBack }) {
         return;
       }
 
-      // 2. Busca o perfil na tabela profiles
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -564,7 +601,6 @@ function LoginPage({ onLogin, onBack }) {
         return;
       }
 
-      // 3. Sucesso — chama callback com o perfil completo
       onLogin(profile);
     } catch (err) {
       console.error("Erro inesperado no login:", err);
@@ -641,6 +677,7 @@ function AppHub({ user, onNavigate, onLogout }) {
     { id: "laudos", title: "Produção de Laudos", desc: "Geração e gestão de PAC e AVN — relatórios psicopedagógicos e neuropsicológicos", icon: FileCheck, color: C.verde, status: "em-breve" },
   ];
   const userApps = apps.filter(a => user.apps?.includes(a.id));
+  const isAdmin = user.role === "admin";
 
   return (
     <div style={hubStyles.page}>
@@ -652,7 +689,12 @@ function AppHub({ user, onNavigate, onLogout }) {
             <div style={hubStyles.headerTitle}>Bem-vindo(a), {user.name.split(" ")[0]}</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {isAdmin && (
+            <button onClick={() => onNavigate("equipe")} style={hubStyles.adminBtn}>
+              <UserCog size={14} /> Gerenciar Equipe
+            </button>
+          )}
           <div style={hubStyles.userChip}>
             <div style={{ ...hubStyles.avatar, background: C.laranja }}>{user.name.charAt(0)}</div>
             <div>
@@ -698,6 +740,478 @@ function AppHub({ user, onNavigate, onLogout }) {
           })}
         </div>
       </main>
+    </div>
+  );
+}
+
+// ============================================================
+// TEAM MANAGER - NOVA TELA DE GERENCIAMENTO DE EQUIPE
+// ============================================================
+function TeamManager({ user, onLogout, onHub }) {
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "ok") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2800);
+  };
+
+  const loadProfiles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      showToast("Erro ao carregar equipe: " + error.message, "error");
+    } else {
+      setProfiles(data || []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  const handleCreate = async (newUserData) => {
+    try {
+      await callEdgeFunction("admin-create-user", newUserData);
+      showToast("Funcionário cadastrado com sucesso!");
+      setShowCreateModal(false);
+      await loadProfiles();
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const handleUpdate = async (userId, updates) => {
+    try {
+      await callEdgeFunction("admin-update-user", { userId, ...updates });
+      showToast("Funcionário atualizado!");
+      setEditingProfile(null);
+      await loadProfiles();
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const handleDelete = async (userId, userName) => {
+    if (!window.confirm(`Remover acesso de ${userName}?\n\nEssa ação é IRREVERSÍVEL. A pessoa não conseguirá mais fazer login.`)) return;
+    try {
+      await callEdgeFunction("admin-delete-user", { userId });
+      showToast("Acesso removido");
+      await loadProfiles();
+    } catch (err) {
+      showToast("Erro: " + err.message, "error");
+    }
+  };
+
+  const filtered = profiles.filter(p => {
+    const m = (p.name + " " + p.email).toLowerCase().includes(search.toLowerCase());
+    const r = filterRole === "all" || p.role === filterRole;
+    return m && r;
+  });
+
+  const stats = {
+    total: profiles.length,
+    admin: profiles.filter(p => p.role === "admin").length,
+    bibliotecario: profiles.filter(p => p.role === "bibliotecario").length,
+    terapeuta: profiles.filter(p => p.role === "terapeuta").length,
+    leitor: profiles.filter(p => p.role === "leitor").length,
+  };
+
+  return (
+    <div style={teamStyles.page}>
+      <header style={hubStyles.header}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button onClick={onHub} style={placeholderStyles.backBtn}>← Hub</button>
+          <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 36, height: 36, objectFit: "contain" }} />
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: C.laranja, fontWeight: 700 }}>GESTÃO</div>
+            <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 22, fontWeight: 700, color: C.azul }}>Equipe</div>
+          </div>
+        </div>
+        <button onClick={onLogout} style={hubStyles.logoutBtn}><LogOut size={14} /> Sair</button>
+      </header>
+
+      <main style={teamStyles.main}>
+        {/* Stats */}
+        <div style={teamStyles.statsGrid}>
+          <StatMini label="Total" value={stats.total} icon={Users} color={C.azul} />
+          <StatMini label="Administradores" value={stats.admin} icon={Crown} color={C.laranja} />
+          <StatMini label="Bibliotecários" value={stats.bibliotecario} icon={BookOpen} color={C.azul} />
+          <StatMini label="Terapeutas" value={stats.terapeuta} icon={Brain} color={C.rosa} />
+          <StatMini label="Leitores" value={stats.leitor} icon={EyeIcon} color={C.verde} />
+        </div>
+
+        {/* Toolbar */}
+        <div style={teamStyles.toolbar}>
+          <div style={teamStyles.searchBox}>
+            <Search size={15} color={C.muted} />
+            <input
+              placeholder="Buscar por nome ou e-mail..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={teamStyles.searchInput}
+            />
+          </div>
+          <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} style={teamStyles.select}>
+            <option value="all">Todas funções</option>
+            <option value="admin">Administradores</option>
+            <option value="bibliotecario">Bibliotecários</option>
+            <option value="terapeuta">Terapeutas</option>
+            <option value="leitor">Leitores</option>
+          </select>
+          <button onClick={() => setShowCreateModal(true)} style={teamStyles.btnPrimary}>
+            <UserPlus size={14} /> Novo Funcionário
+          </button>
+        </div>
+
+        {/* Lista */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 60, color: C.muted }}>Carregando equipe...</div>
+        ) : filtered.length === 0 ? (
+          <div style={teamStyles.emptyState}>
+            <div style={teamStyles.emptyIcon}>
+              <Users size={32} color={C.azul} strokeWidth={1.6} />
+            </div>
+            <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 18, fontWeight: 700, marginTop: 14 }}>
+              {profiles.length === 0 ? "Nenhum funcionário cadastrado" : "Nenhum resultado"}
+            </div>
+            <div style={{ color: C.muted, marginTop: 5, fontSize: 13 }}>
+              {profiles.length === 0 ? "Clique em 'Novo Funcionário' para começar." : "Tente outro filtro ou busca."}
+            </div>
+          </div>
+        ) : (
+          <div style={teamStyles.cardsGrid}>
+            {filtered.map(p => (
+              <TeamMemberCard
+                key={p.id}
+                profile={p}
+                currentUserId={user.id}
+                onEdit={() => setEditingProfile(p)}
+                onDelete={() => handleDelete(p.id, p.name)}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {showCreateModal && (
+        <UserFormModal
+          title="Novo Funcionário"
+          onClose={() => setShowCreateModal(false)}
+          onSave={handleCreate}
+          mode="create"
+        />
+      )}
+
+      {editingProfile && (
+        <UserFormModal
+          title={`Editar ${editingProfile.name}`}
+          initial={editingProfile}
+          onClose={() => setEditingProfile(null)}
+          onSave={(data) => handleUpdate(editingProfile.id, data)}
+          mode="edit"
+        />
+      )}
+
+      {toast && (
+        <div style={{ ...acervoStyles.toast, background: toast.type === "error" ? C.rosa : C.verde }}>
+          {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatMini({ label, value, icon: Icon, color }) {
+  return (
+    <div style={teamStyles.statCard}>
+      <div style={{ ...teamStyles.statIcon, background: color + "1A" }}>
+        <Icon size={16} color={color} strokeWidth={2.2} />
+      </div>
+      <div>
+        <div style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 22, fontWeight: 800, lineHeight: 1, color: C.texto }}>{value}</div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 3, fontWeight: 600 }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberCard({ profile, currentUserId, onEdit, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const RoleIcon = ROLE_ICONS[profile.role] || User;
+  const color = ROLE_COLORS[profile.role] || C.muted;
+  const isYou = profile.id === currentUserId;
+
+  const userApps = (profile.apps || []).map(appId => AVAILABLE_APPS.find(a => a.id === appId)).filter(Boolean);
+
+  return (
+    <div style={teamStyles.memberCard}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: color }} />
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+        <div style={{ ...hubStyles.avatar, background: color, width: 48, height: 48, fontSize: 18 }}>
+          {profile.name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <h3 style={teamStyles.memberName}>{profile.name}</h3>
+            {isYou && (
+              <span style={{ fontSize: 9, padding: "2px 6px", background: C.amarelo + "30", color: "#a47e1c", borderRadius: 100, fontWeight: 700, textTransform: "uppercase" }}>
+                VOCÊ
+              </span>
+            )}
+          </div>
+          <div style={teamStyles.memberEmail}>{profile.email}</div>
+        </div>
+
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setMenuOpen(!menuOpen)} style={teamStyles.menuBtn}>
+            <MoreVertical size={16} />
+          </button>
+          {menuOpen && (
+            <>
+              <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 5 }} />
+              <div style={teamStyles.menuDropdown}>
+                <button onClick={() => { setMenuOpen(false); onEdit(); }} style={teamStyles.menuItem}>
+                  <Edit3 size={13} /> Editar
+                </button>
+                {!isYou && (
+                  <button onClick={() => { setMenuOpen(false); onDelete(); }} style={{ ...teamStyles.menuItem, color: C.rosa }}>
+                    <Trash2 size={13} /> Remover acesso
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={teamStyles.memberInfo}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <RoleIcon size={13} color={color} strokeWidth={2.2} />
+          <span style={{ fontSize: 12, fontWeight: 700, color }}>{ROLE_LABELS[profile.role]}</span>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.borderSoft}` }}>
+        <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", marginBottom: 6, letterSpacing: 0.5 }}>Aplicativos</div>
+        {userApps.length === 0 ? (
+          <div style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>Sem acesso</div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {userApps.map(app => {
+              const Icon = app.icon;
+              return (
+                <span key={app.id} style={{ ...teamStyles.appTag, background: app.color + "15", color: app.color }}>
+                  <Icon size={10} strokeWidth={2.2} /> {app.label.split(" ")[0]}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UserFormModal({ title, initial, onClose, onSave, mode }) {
+  const [form, setForm] = useState({
+    name: initial?.name || "",
+    email: initial?.email || "",
+    password: "",
+    role: initial?.role || "leitor",
+    apps: initial?.apps || ["acervo"],
+  });
+  const [showPwd, setShowPwd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const toggleApp = (appId) => {
+    setForm(f => ({
+      ...f,
+      apps: f.apps.includes(appId) ? f.apps.filter(a => a !== appId) : [...f.apps, appId],
+    }));
+  };
+
+  const handleSubmit = async () => {
+    console.log("🔵 [DEBUG] handleSubmit iniciado");
+    console.log("🔵 [DEBUG] form atual:", form);
+    console.log("🔵 [DEBUG] mode:", mode);
+    
+    setError("");
+
+    if (!form.name.trim()) { 
+      console.log("❌ [DEBUG] Nome vazio");
+      setError("Nome é obrigatório"); 
+      return; 
+    }
+    if (mode === "create" && !form.email.trim()) { 
+      console.log("❌ [DEBUG] Email vazio");
+      setError("E-mail é obrigatório"); 
+      return; 
+    }
+    if (mode === "create" && form.password.length < 12) { 
+      console.log("❌ [DEBUG] Senha curta:", form.password.length, "chars");
+      setError("Senha deve ter pelo menos 12 caracteres"); 
+      return; 
+    }
+
+    console.log("✅ [DEBUG] Validações passaram, chamando onSave...");
+    setSaving(true);
+    try {
+      const payload = mode === "create" ? {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        apps: form.apps,
+      } : {
+        name: form.name,
+        role: form.role,
+        apps: form.apps,
+      };
+      console.log("🔵 [DEBUG] Payload:", payload);
+      
+      await onSave(payload);
+      console.log("✅ [DEBUG] onSave completou com sucesso");
+    } catch (err) {
+      console.log("❌ [DEBUG] Erro em onSave:", err);
+      setError(err.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={acervoStyles.modalBackdrop} onClick={onClose}>
+      <div style={acervoStyles.modal} onClick={(e) => e.stopPropagation()}>
+        <div style={acervoStyles.modalHeader}>
+          <h3 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: 20, fontWeight: 700, margin: 0, color: C.azul }}>{title}</h3>
+          <button onClick={onClose} style={acervoStyles.iconBtn}><X size={16} /></button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={teamStyles.formLabel}>Nome completo *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              style={teamStyles.formInput}
+              placeholder="Maria Silva"
+            />
+          </div>
+
+          {mode === "create" && (
+            <>
+              <div>
+                <label style={teamStyles.formLabel}>E-mail *</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  style={teamStyles.formInput}
+                  placeholder="maria@cienah.com.br"
+                />
+              </div>
+
+              <div>
+                <label style={teamStyles.formLabel}>Senha temporária *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showPwd ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    style={{ ...teamStyles.formInput, paddingRight: 44 }}
+                    placeholder="Min. 12 chars, com maiúsc, número e símbolo"
+                  />
+                  <button type="button" onClick={() => setShowPwd(!showPwd)} style={loginStyles.eyeBtn}>
+                    {showPwd ? <EyeOff size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                  ⚠️ Anote essa senha. A pessoa não receberá email automático.
+                </div>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label style={teamStyles.formLabel}>Função</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {Object.keys(ROLE_LABELS).map(role => {
+                const Icon = ROLE_ICONS[role];
+                const color = ROLE_COLORS[role];
+                const selected = form.role === role;
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setForm({ ...form, role })}
+                    style={{
+                      ...teamStyles.roleBtn,
+                      border: selected ? `2px solid ${color}` : `2px solid ${C.borderSoft}`,
+                      background: selected ? color + "10" : "white",
+                    }}
+                  >
+                    <Icon size={14} color={color} strokeWidth={2.2} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: selected ? color : C.texto }}>
+                      {ROLE_LABELS[role]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label style={teamStyles.formLabel}>Aplicativos com acesso</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {AVAILABLE_APPS.map(app => {
+                const Icon = app.icon;
+                const selected = form.apps.includes(app.id);
+                return (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => toggleApp(app.id)}
+                    style={{
+                      ...teamStyles.appBtn,
+                      border: selected ? `2px solid ${app.color}` : `2px solid ${C.borderSoft}`,
+                      background: selected ? app.color + "10" : "white",
+                    }}
+                  >
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${selected ? app.color : C.border}`, background: selected ? app.color : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {selected && <Check size={11} color="white" strokeWidth={3} />}
+                    </div>
+                    <Icon size={16} color={app.color} strokeWidth={2} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.texto, textAlign: "left", flex: 1 }}>{app.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {error && (
+            <div style={loginStyles.error}><AlertCircle size={14} /> {error}</div>
+          )}
+        </div>
+
+        <div style={acervoStyles.modalActions}>
+          <button onClick={onClose} style={acervoStyles.btnGhost} disabled={saving}>Cancelar</button>
+          <button onClick={handleSubmit} style={acervoStyles.btnPrimary} disabled={saving}>
+            {saving ? "Salvando..." : <><Check size={13} /> {mode === "create" ? "Criar funcionário" : "Salvar alterações"}</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1648,6 +2162,7 @@ const hubStyles = {
   userChip: { display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 6px 6px", background: C.offWhite, borderRadius: 100, border: `1px solid ${C.border}` },
   avatar: { width: 36, height: 36, borderRadius: "50%", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Fredoka', sans-serif", fontSize: 16, fontWeight: 700 },
   logoutBtn: { display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "white", border: `1px solid ${C.border}`, borderRadius: 100, cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.texto },
+  adminBtn: { display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", background: C.azul, color: "white", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 13, fontWeight: 700 },
   main: { padding: "3rem 2.5rem", maxWidth: 1300, margin: "0 auto" },
   h1: { fontFamily: "'Fredoka', sans-serif", fontSize: 32, fontWeight: 700, color: C.azul, margin: 0, lineHeight: 1.1 },
   appsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 },
@@ -1657,6 +2172,34 @@ const hubStyles = {
   appDesc: { fontSize: 13.5, color: C.textoSuave, lineHeight: 1.6, margin: 0, flex: 1 },
   appFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: `1px solid ${C.borderSoft}` },
   appBadge: { display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 100, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 },
+};
+
+const teamStyles = {
+  page: { minHeight: "100vh", background: C.offWhite, fontFamily: "'Inter', sans-serif" },
+  main: { padding: "2rem 2.5rem", maxWidth: 1300, margin: "0 auto" },
+  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 },
+  statCard: { background: "white", border: `1px solid ${C.border}`, padding: 14, borderRadius: 12, display: "flex", alignItems: "center", gap: 10 },
+  statIcon: { width: 38, height: 38, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  toolbar: { display: "flex", gap: 8, marginBottom: 20, alignItems: "center", flexWrap: "wrap" },
+  searchBox: { flex: 1, minWidth: 220, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "white", border: `1px solid ${C.border}`, borderRadius: 9 },
+  searchInput: { flex: 1, border: "none", background: "transparent", fontSize: 14, fontFamily: "'Inter', sans-serif", color: C.texto },
+  select: { padding: "10px 14px", background: "white", border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 13, cursor: "pointer", fontWeight: 500, color: C.texto },
+  btnPrimary: { display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", background: C.laranja, color: "#fff", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 13, fontWeight: 700 },
+  cardsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 },
+  memberCard: { background: "white", border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, position: "relative", overflow: "hidden" },
+  memberName: { fontFamily: "'Fredoka', sans-serif", fontSize: 16, fontWeight: 700, margin: 0, color: C.texto, lineHeight: 1.2 },
+  memberEmail: { fontSize: 12, color: C.muted, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  memberInfo: { paddingTop: 8 },
+  menuBtn: { width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: C.offWhite, border: `1px solid ${C.borderSoft}`, borderRadius: 7, cursor: "pointer", color: C.muted },
+  menuDropdown: { position: "absolute", top: 36, right: 0, background: "white", border: `1px solid ${C.border}`, borderRadius: 9, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 5, minWidth: 160, zIndex: 10 },
+  menuItem: { display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 12px", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: C.texto, fontWeight: 500, borderRadius: 6, textAlign: "left" },
+  appTag: { display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 100, fontSize: 10.5, fontWeight: 700 },
+  emptyState: { textAlign: "center", padding: "60px 20px", background: "white", border: `1px dashed ${C.border}`, borderRadius: 12 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 18, background: C.azul + "12", display: "inline-flex", alignItems: "center", justifyContent: "center" },
+  formLabel: { fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: C.azul, display: "block", marginBottom: 6, fontWeight: 700 },
+  formInput: { width: "100%", padding: "11px 14px", border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 14, background: "white", fontFamily: "'Inter', sans-serif", color: C.texto },
+  roleBtn: { display: "flex", alignItems: "center", gap: 7, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontFamily: "'Inter', sans-serif", justifyContent: "center" },
+  appBtn: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "'Inter', sans-serif" },
 };
 
 const placeholderStyles = {
