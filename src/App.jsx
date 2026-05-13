@@ -301,7 +301,6 @@ export default function App() {
           sessionData = await Promise.race([sessionPromise, timeoutPromise]);
         } catch (timeoutErr) {
           console.error("⚠️ getSession travou — limpando storage e seguindo:", timeoutErr);
-          // Se travou, faz logout local e segue sem sessão
           try {
             await supabase.auth.signOut({ scope: "local" });
           } catch {}
@@ -326,7 +325,6 @@ export default function App() {
       } catch (err) {
         console.error("Erro fatal na inicializacao:", err);
       } finally {
-        // SEMPRE termina o loading, mesmo se der erro
         if (mounted) setLoadingSession(false);
       }
     };
@@ -436,71 +434,7 @@ export default function App() {
     </>
   );
 }
-  useEffect(() => {
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await fetchProfile(session.user);
-        if (profile) setUser(profile);
-      }
-      setLoadingSession(false);
-    };
-    init();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user);
-        if (profile) setUser(profile);
-      } else {
-        setUser(null);
-        setRoute("home");
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  const handleLogin = (profile) => {
-    setUser(profile);
-    if (profile.apps?.includes("acervo")) setRoute("acervo");
-    else if (profile.apps?.includes("aba")) setRoute("aba");
-    else if (profile.apps?.includes("laudos")) setRoute("laudos");
-    else setRoute("hub");
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setRoute("home");
-  };
-
-  if (loadingSession) {
-    return (
-      <>
-        <FontAndStyles />
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.offWhite, fontFamily: "'Inter', sans-serif" }}>
-          <div style={{ textAlign: "center" }}>
-            <img src="/cienah-logo.png" alt="CIENAH" style={{ width: 80, height: 80, objectFit: "contain" }} />
-            <div style={{ marginTop: 20, fontSize: 14, color: C.azul, fontWeight: 600 }}>Carregando...</div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <FontAndStyles />
-      {route === "home" && <LandingPage onNavigate={setRoute} user={user} />}
-      {route === "login" && <LoginPage onLogin={handleLogin} onBack={() => setRoute("home")} />}
-      {route === "hub" && user && <AppHub user={user} onNavigate={setRoute} onLogout={handleLogout} />}
-      {route === "equipe" && user && user.role === "admin" && <TeamManager user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} />}
-      {route === "acervo" && user && (user.apps?.includes("acervo") ? <AcervoApp user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
-      {route === "aba" && user && (user.apps?.includes("aba") ? <PlaceholderApp app="aba" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
-      {route === "laudos" && user && (user.apps?.includes("laudos") ? <PlaceholderApp app="laudos" user={user} onLogout={handleLogout} onHub={() => setRoute("hub")} /> : <NoAccess onBack={() => setRoute("hub")} />)}
-    </>
-  );
-}
 // ============================================================
 // LANDING PAGE
 // ============================================================
