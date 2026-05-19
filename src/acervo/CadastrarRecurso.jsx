@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { C, TIPOS_RECURSO, ESTADOS, FAIXAS_ETARIAS } from "../lib/constants";
-import { slugify } from "../Lib/helpers";
+import { slugify } from "../lib/helpers";
 
 export default function CadastrarRecurso({ resource, rooms, categories, onClose, onSave }) {
   const isEdit = !!resource;

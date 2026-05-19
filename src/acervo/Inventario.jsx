@@ -4,7 +4,7 @@
 import { useState, useMemo } from "react";
 import { Printer, MapPin, Box, Sparkles, ChevronDown, ChevronRight, Hash } from "lucide-react";
 import { C } from "../lib/constants";
-import { tipoInfo, estadoInfo } from "../Lib/helpers";
+import { tipoInfo, estadoInfo } from "../lib/helpers";
 
 export default function Inventario({ data }) {
   const [expandedSalas, setExpandedSalas] = useState({});

@@ -7,7 +7,7 @@ import {
   Sparkles, Box, Hash, MapPin, X,
 } from "lucide-react";
 import { C, TIPOS_RECURSO, ESTADOS } from "../lib/constants";
-import { tipoInfo, estadoInfo, faixaInfo } from "../Lib/helpers";
+import { tipoInfo, estadoInfo, faixaInfo } from "../lib/helpers";
 
 export default function Catalogo({ data, perms, onEdit, onDelete, onCadastrar }) {
   const [search, setSearch] = useState("");

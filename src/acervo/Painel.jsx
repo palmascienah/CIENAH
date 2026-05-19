@@ -7,7 +7,7 @@ import {
   TrendingUp, Box, ArrowRight,
 } from "lucide-react";
 import { C, TIPOS_RECURSO } from "../lib/constants";
-import { tipoInfo, estadoInfo, fmt } from "../Lib/helpers";
+import { tipoInfo, estadoInfo, fmt } from "../lib/helpers";
 
 export default function Painel({ data, setView, onCadastrar }) {
   const stats = useMemo(() => {

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Check, AlertCircle } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { C, ROLE_PERMISSIONS } from "../lib/constants";
-import { resourceFromDb } from "../Lib/helpers";
+import { resourceFromDb } from "../lib/helpers";
 
 import Sidebar from "./Sidebar";
 import Painel from "./Painel";

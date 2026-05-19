@@ -4,7 +4,7 @@
 import { useState, useMemo } from "react";
 import { Printer, Hash, Search, Check, X, Sparkles } from "lucide-react";
 import { C } from "../lib/constants";
-import { tipoInfo } from "../Lib/helpers";
+import { tipoInfo } from "../lib/helpers";
 
 // ============================================================
 // Gerador simples de barras estilo CODE-128
