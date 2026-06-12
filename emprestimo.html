@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIENAH · Empréstimo de Recursos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --verde:#054F6F;--verde2:#3D5944;--magenta:#BE3455;
+    --laranja:#D6893D;--mostarda:#DDB042;
+    --bg:#F7F9FA;--card:#fff;--border:#e2e8f0;
+    --text:#1a2332;--muted:#64748b;--radius:12px
+  }
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+  /* HEADER */
+  header{background:var(--verde);padding:18px 20px 14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(5,79,111,.25)}
+  .header-inner{max-width:680px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+  .logo-area h1{font-family:'Fredoka',sans-serif;font-size:20px;color:#fff;font-weight:600;letter-spacing:.3px}
+  .logo-area p{font-size:11px;color:#9fd4e8;margin-top:1px}
+  .estoque-total{text-align:right}
+  .estoque-total strong{font-family:'Fredoka',sans-serif;font-size:22px;color:#fff;display:block;line-height:1}
+  .estoque-total span{font-size:10px;color:#9fd4e8;text-transform:uppercase;letter-spacing:.5px}
+
+  /* MAIN */
+  main{max-width:680px;margin:0 auto;padding:16px 14px 120px}
+
+  /* PROFISSIONAL */
+  .prof-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
+  .prof-card label{font-size:12px;font-weight:600;color:var(--verde);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:8px}
+  .prof-card select{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'Inter',sans-serif;font-size:15px;color:var(--text);background:#fff;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+  .prof-card select:focus{outline:none;border-color:var(--verde)}
+
+  /* BUSCA */
+  .search-wrap{position:relative;margin-bottom:12px}
+  .search-wrap input{width:100%;padding:10px 12px 10px 38px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;background:#fff}
+  .search-wrap input:focus{outline:none;border-color:var(--verde)}
+  .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)}
+
+  /* CATEGORIAS */
+  .cats{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .cat-btn{padding:6px 13px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;background:#fff;color:var(--muted);font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
+  .cat-btn.active{background:var(--verde);color:#fff;border-color:var(--verde)}
+
+  /* GRID */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;margin-bottom:16px}
+  .item-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:11px;cursor:pointer;transition:all .15s;position:relative;-webkit-tap-highlight-color:transparent;user-select:none}
+  .item-card:active{transform:scale(.97)}
+  .item-card.selected{border-color:var(--verde);background:#eef6fb;box-shadow:0 0 0 3px rgba(5,79,111,.1)}
+  .item-card.esgotado{opacity:.45;cursor:not-allowed;background:#f8f8f8}
+  .chk{position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;background:var(--verde);display:none;align-items:center;justify-content:center}
+  .item-card.selected .chk{display:flex}
+  .chk svg{width:12px;height:12px;stroke:#fff;stroke-width:3}
+  .tipo-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:#e8f4fb;color:var(--verde);margin-bottom:5px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tipo-pill.cartas{background:#fdf0f3;color:var(--magenta)}
+  .tipo-pill.encaixe{background:#fff8e6;color:#8a5e00}
+  .tipo-pill.tabuleiro{background:#f0fff4;color:var(--verde2)}
+  .tipo-pill.pareamento{background:#fdf6ff;color:#6b21a8}
+  .tipo-pill.causa{background:#fff5f0;color:#c2410c}
+  .tipo-pill.papelaria{background:#f0f4ff;color:#1d4ed8}
+  .tipo-pill.outros{background:#f4f4f5;color:#52525b}
+  .nome{font-size:12px;font-weight:500;color:var(--text);line-height:1.35;margin-bottom:7px;min-height:32px}
+  .disp{font-size:11px;color:var(--muted)}
+  .disp b{color:var(--text);font-weight:600}
+  .qty-row{display:none;align-items:center;gap:8px;margin-top:8px}
+  .item-card.selected .qty-row{display:flex}
+  .qty-btn{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:16px;line-height:1;color:var(--text);display:flex;align-items:center;justify-content:center;font-weight:600}
+  .qty-btn:active{background:var(--bg)}
+  .qty-val{font-size:14px;font-weight:600;min-width:18px;text-align:center;color:var(--verde)}
+  .no-res{grid-column:1/-1;text-align:center;padding:28px 0;color:var(--muted);font-size:14px}
+
+  /* CART FIXO */
+  .cart-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);z-index:200;box-shadow:0 -4px 20px rgba(0,0,0,.1)}
+  .cart-bar-inner{max-width:680px;margin:0 auto;padding:12px 14px}
+  .cart-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:2px 0 10px}
+  .cart-toggle-left{display:flex;align-items:center;gap:10px}
+  .cart-label{font-size:14px;font-weight:600;color:var(--text)}
+  .cart-badge{background:var(--magenta);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:2px 8px}
+  .cart-badge.hidden{display:none}
+  .cart-toggle-right{font-size:12px;color:var(--muted)}
+  .cart-body{display:none;max-height:240px;overflow-y:auto;border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px}
+  .cart-body.open{display:block}
+  .cart-item{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;gap:8px}
+  .cart-item:last-child{border:none}
+  .ci-nome{flex:1;font-size:13px;color:var(--text)}
+  .ci-cod{font-size:10px;color:var(--muted)}
+  .ci-qty{font-size:13px;font-weight:600;color:var(--verde);white-space:nowrap;min-width:28px;text-align:right}
+  .ci-rem{background:none;border:none;cursor:pointer;color:var(--magenta);padding:4px;display:flex;align-items:center}
+  .cart-empty{font-size:13px;color:var(--muted);padding:10px 0;text-align:center}
+  .cart-actions{display:flex;gap:10px}
+  .btn-clear{flex:0 0 auto;padding:11px 16px;background:none;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;color:var(--muted);font-family:'Inter',sans-serif}
+  .btn-confirm{flex:1;padding:11px 16px;background:var(--verde);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:background .15s}
+  .btn-confirm:hover{background:#043a52}
+  .btn-confirm:disabled{background:#c0ccd6;cursor:not-allowed}
+
+  /* MODAL COMPROVANTE */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:16px}
+  .modal-overlay.open{display:flex}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-header{background:var(--verde);padding:20px 22px;display:flex;justify-content:space-between;align-items:flex-start}
+  .modal-header h2{font-family:'Fredoka',sans-serif;font-size:20px;color:#fff;font-weight:600}
+  .modal-header p{font-size:12px;color:#9fd4e8;margin-top:2px}
+  .modal-close{background:none;border:none;cursor:pointer;color:#9fd4e8;font-size:22px;line-height:1;padding:2px 6px}
+  .modal-body{padding:20px 22px;max-height:60vh;overflow-y:auto}
+  .modal-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .modal-info-item{background:#f7f9fa;border-radius:8px;padding:10px 12px}
+  .modal-info-item label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px}
+  .modal-info-item span{font-size:14px;font-weight:600;color:var(--text)}
+  .modal-table{width:100%;border-collapse:collapse;font-size:13px}
+  .modal-table th{text-align:left;padding:7px 8px;background:#f1f5f9;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .modal-table td{padding:9px 8px;border-bottom:1px solid #f1f5f9;color:var(--text)}
+  .modal-table tr:last-child td{border:none}
+  .modal-footer{padding:16px 22px;border-top:1px solid var(--border);display:flex;gap:10px}
+  .btn-pdf{flex:1;padding:12px;background:var(--magenta);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+  .btn-wpp{flex:1;padding:12px;background:#25D366;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+  .btn-novo{padding:12px 16px;background:none;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;color:var(--muted);font-family:'Inter',sans-serif}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2332;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:420px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+    .modal-info{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-area">
+      <h1>🧠 CIENAH</h1>
+      <p>Empréstimo de Recursos Terapêuticos</p>
+    </div>
+    <div class="estoque-total">
+      <strong id="total-disp">—</strong>
+      <span>disponíveis</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="prof-card">
+    <label>👤 Profissional responsável</label>
+    <select id="profissional" onchange="updateConfirm()">
+      <option value="">Selecione seu nome...</option>
+      <option>Arlindo</option>
+      <option>Diógenes</option>
+      <option>Alicia (Sala Giovanna)</option>
+      <option>Lioneide</option>
+      <option>Manuela</option>
+      <option>Mariana</option>
+      <option>Milena</option>
+      <option>Sophia / Lanny</option>
+      <option>Equipe ABA</option>
+      <option>Amanda Kelly</option>
+      <option>Estefanye Soeiro</option>
+      <option>Outro</option>
+    </select>
+  </div>
+
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="busca" placeholder="Buscar recurso por nome ou código..." oninput="renderGrid()">
+  </div>
+
+  <div class="cats" id="cats"></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<!-- CART FIXO -->
+<div class="cart-bar">
+  <div class="cart-bar-inner">
+    <div class="cart-toggle" onclick="toggleCart()">
+      <div class="cart-toggle-left">
+        <span class="cart-label">Selecionados</span>
+        <span class="cart-badge hidden" id="cart-badge">0</span>
+      </div>
+      <span class="cart-toggle-right" id="cart-arrow">▲ ver lista</span>
+    </div>
+    <div class="cart-body" id="cart-body"></div>
+    <div class="cart-actions">
+      <button class="btn-clear" onclick="clearCart()">Limpar</button>
+      <button class="btn-confirm" id="btn-confirm" onclick="abrirModal()" disabled>Confirmar retirada</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Comprovante de Retirada</h2>
+        <p id="modal-data"></p>
+      </div>
+      <button class="modal-close" onclick="fecharModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info">
+        <div class="modal-info-item"><label>Profissional</label><span id="modal-prof">—</span></div>
+        <div class="modal-info-item"><label>Total de itens</label><span id="modal-total">—</span></div>
+      </div>
+      <table class="modal-table">
+        <thead><tr><th>Recurso</th><th>Cód.</th><th style="text-align:right">Qtd</th></tr></thead>
+        <tbody id="modal-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-novo" onclick="fecharModal()">Voltar</button>
+      <button class="btn-wpp" onclick="enviarWhatsApp()">📲 WhatsApp</button>
+      <button class="btn-pdf" onclick="imprimirPDF()">🖨️ PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BLOQUEADOS_TIPOS = ["Livro","Instrumento Musical"];
+const BLOQUEADOS_PARCIAL = [
+  "chef de cozinha","confeitaria","doce chef","geração chef","little candy",
+  "máquina de sorvete","cafeteria","kitchen set","microondas","liquidificador",
+  "batedeira","escorredor de pratos","sweet juice","caixa registradora",
+  "máquina de lavar","aspirador de pó","tábua de passar","passando roupinha",
+  "bebê-conforto","máquina de sorvete"
+];
+
+const TODOS = [
+  {c:"0002",n:"Jogo tira varetas patrulha canina",t:"Brinquedo/Lúdico",q:1},
+  {c:"0004",n:"Telefone Amarelo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0005",n:"Telefone colorido",t:"Brinquedo/Lúdico",q:1},
+  {c:"0006",n:"Caixas de encaixe",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0007",n:"Crocodilo morde",t:"Brinquedo/Lúdico",q:2},
+  {c:"0008",n:"Quebra-cabeça cachorros",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0009",n:"SR. balde",t:"Brinquedo/Lúdico",q:1},
+  {c:"0010",n:"Girafa baby",t:"Brinquedo/Lúdico",q:1},
+  {c:"0011",n:"Girafa e Hipopótamo didático",t:"Brinquedo/Lúdico",q:2},
+  {c:"0012",n:"Barbie",t:"Brinquedo/Lúdico",q:2},
+  {c:"0013",n:"Giz de chão",t:"Brinquedo/Lúdico",q:3},
+  {c:"0022",n:"Lousa mágica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0023",n:"Caixa encaixe",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0024",n:"Ábaco mágico caracol",t:"Brinquedo/Lúdico",q:1},
+  {c:"0025",n:"Dado formas geométricas",t:"Encaixes/Quebra-cabeça",q:4},
+  {c:"0026",n:"Copos coloridos pareamento",t:"Pareamento",q:17},
+  {c:"0027",n:"O que é o que é?",t:"Jogo de Tabuleiro",q:1},
+  {c:"0028",n:"Galinheiro maluco",t:"Causa e Efeito",q:1},
+  {c:"0029",n:"Mini pista bombeiro",t:"Brinquedo/Lúdico",q:1},
+  {c:"0030",n:"Gato de sapato",t:"Brinquedo/Lúdico",q:1},
+  {c:"0031",n:"Você entrou em uma emboscada",t:"Brinquedo/Lúdico",q:2},
+  {c:"0032",n:"Meus bichinhos quebra-cabeça",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0033",n:"Ludo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0034",n:"Maleta doctor",t:"Brinquedo/Lúdico",q:1},
+  {c:"0035",n:"Mini basquete com placar",t:"Brinquedo/Lúdico",q:1},
+  {c:"0036",n:"Homem de ferro",t:"Brinquedo/Lúdico",q:1},
+  {c:"0037",n:"Hulk",t:"Brinquedo/Lúdico",q:1},
+  {c:"0039",n:"Lagartas coloridas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0040",n:"Dedoche dinossauros",t:"Brinquedo/Lúdico",q:3},
+  {c:"0041",n:"Animais da fazenda",t:"Brinquedo/Lúdico",q:4},
+  {c:"0042",n:"Frutas e legumes",t:"Brinquedo/Lúdico",q:1},
+  {c:"0043",n:"Fazenda de madeira",t:"Brinquedo/Lúdico",q:2},
+  {c:"0044",n:"Lego duplo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0045",n:"Pista de carrinhos infantis",t:"Brinquedo/Lúdico",q:1},
+  {c:"0047",n:"Blocos de madeira colorido",t:"Brinquedo/Lúdico",q:1},
+  {c:"0048",n:"Kit ferramentas com fantasia",t:"Brinquedo/Lúdico",q:1},
+  {c:"0049",n:"Carrinhos",t:"Brinquedo/Lúdico",q:3},
+  {c:"0050",n:"Kit moldes de massinha",t:"Papelaria/Material",q:2},
+  {c:"0051",n:"Kit pistola de dardos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0052",n:"Brincando de engenheiro",t:"Brinquedo/Lúdico",q:2},
+  {c:"0053",n:"Lego duplo (2)",t:"Brinquedo/Lúdico",q:1},
+  {c:"0054",n:"Conjunto de trenzinho",t:"Brinquedo/Lúdico",q:1},
+  {c:"0055",n:"Legos coloridos",t:"Brinquedo/Lúdico",q:2},
+  {c:"0056",n:"Super herói",t:"Brinquedo/Lúdico",q:1},
+  {c:"0057",n:"Kit fadinhas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0058",n:"Quebra-cabeça mamãe e bebê",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0059",n:"Kit de beleza fashion",t:"Brinquedo/Lúdico",q:5},
+  {c:"0060",n:"Conjunto de blocos duplos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0061",n:"Blocos pedagógicos de madeira",t:"Brinquedo/Lúdico",q:1},
+  {c:"0062",n:"Trilhos de trem de madeira",t:"Brinquedo/Lúdico",q:1},
+  {c:"0064",n:"Lig Lig",t:"Brinquedo/Lúdico",q:2},
+  {c:"0065",n:"Pista de carrinho infantil",t:"Brinquedo/Lúdico",q:1},
+  {c:"0066",n:"Popper bola",t:"Brinquedo/Lúdico",q:2},
+  {c:"0067",n:"Quebra-cabeça tigre",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0068",n:"Pareamento palitos de picolé",t:"Pareamento",q:1},
+  {c:"0069",n:"Quebra-cabeça",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0070",n:"Pizza de plástico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0071",n:"Jogo alfabetização e lógica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0072",n:"Categoria profissões",t:"Brinquedo/Lúdico",q:1},
+  {c:"0073",n:"Pareamento pompons",t:"Pareamento",q:1},
+  {c:"0074",n:"Cartões com letras e imagens",t:"Brinquedo/Lúdico",q:1},
+  {c:"0075",n:"Kit comidinha infantil",t:"Brinquedo/Lúdico",q:1},
+  {c:"0076",n:"Rotina do banheiro",t:"Brinquedo/Lúdico",q:1},
+  {c:"0077",n:"Pareamento de animais",t:"Pareamento",q:1},
+  {c:"0078",n:"Macaco comilão",t:"Brinquedo/Lúdico",q:1},
+  {c:"0079",n:"Roleta das emoções",t:"Brinquedo/Lúdico",q:1},
+  {c:"0080",n:"Baby cards leiturinha",t:"Cartas",q:1},
+  {c:"0081",n:"Cartões de sílabas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0082",n:"Cartões ilustrativos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0083",n:"Cartões consciência fonológica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0084",n:"Pompom preto pequeno",t:"Brinquedo/Lúdico",q:9},
+  {c:"0085",n:"Montessori base de madeira",t:"Brinquedo/Lúdico",q:1},
+  {c:"0086",n:"Jogo da memória eletrônico",t:"Cartas",q:1},
+  {c:"0087",n:"Trem dos animais de plástico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0088",n:"Bolha de sabão",t:"Brinquedo/Lúdico",q:5},
+  {c:"0090",n:"Porco guloso",t:"Brinquedo/Lúdico",q:1},
+  {c:"0091",n:"Jogo das formas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0092",n:"Pinguim numa fria",t:"Brinquedo/Lúdico",q:1},
+  {c:"0093",n:"Puxa puxa batata",t:"Brinquedo/Lúdico",q:1},
+  {c:"0094",n:"Casinha dos animais",t:"Brinquedo/Lúdico",q:1},
+  {c:"0095",n:"Quebra-cabeça mundi",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0096",n:"Casa da sabedoria desmontagem",t:"Brinquedo/Lúdico",q:1},
+  {c:"0097",n:"Quebra-cabeça mapa do Brasil",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0098",n:"Jogo de memória Avengers",t:"Cartas",q:1},
+  {c:"0099",n:"Forca boneco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0100",n:"Sobe sobe cadeirinha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0101",n:"Mini carimbos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0102",n:"Jogo da velha gato e rato",t:"Brinquedo/Lúdico",q:1},
+  {c:"0103",n:"Banco imobiliário junior",t:"Jogo de Tabuleiro",q:1},
+  {c:"0104",n:"Potinhos para empilhar",t:"Brinquedo/Lúdico",q:1},
+  {c:"0105",n:"Formas geométricas com pinos",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0106",n:"Forca pirata",t:"Brinquedo/Lúdico",q:1},
+  {c:"0107",n:"Kit montagem espaço vapt",t:"Brinquedo/Lúdico",q:1},
+  {c:"0108",n:"Hora do piquenique",t:"Brinquedo/Lúdico",q:1},
+  {c:"0109",n:"Jogo partiu",t:"Brinquedo/Lúdico",q:1},
+  {c:"0110",n:"Bolas variadas",t:"Brinquedo/Lúdico",q:10},
+  {c:"0112",n:"Varetas coloridas grandes",t:"Brinquedo/Lúdico",q:1},
+  {c:"0113",n:"Raquetes",t:"Brinquedo/Lúdico",q:1},
+  {c:"0114",n:"Ratoeira maluca",t:"Brinquedo/Lúdico",q:1},
+  {c:"0115",n:"Pula macaco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0116",n:"Quebra-cabeça lógica e reflexo",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0117",n:"Mini quebra-cabeça Mickey",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0118",n:"Cubos coloridos didático",t:"Brinquedo/Lúdico",q:2},
+  {c:"0119",n:"Cubo labirinto",t:"Brinquedo/Lúdico",q:1},
+  {c:"0120",n:"Jogo dominó de cartas",t:"Cartas",q:1},
+  {c:"0121",n:"Color addicct",t:"Brinquedo/Lúdico",q:1},
+  {c:"0122",n:"Língua solta",t:"Brinquedo/Lúdico",q:1},
+  {c:"0123",n:"Uno",t:"Brinquedo/Lúdico",q:2},
+  {c:"0124",n:"Taco gato cabra queijo pizza",t:"Brinquedo/Lúdico",q:1},
+  {c:"0125",n:"Cartas Harry Potter horcruxes",t:"Cartas",q:1},
+  {c:"0126",n:"Dominó",t:"Brinquedo/Lúdico",q:2},
+  {c:"0127",n:"Tapa certo Avengers",t:"Brinquedo/Lúdico",q:1},
+  {c:"0128",n:"Cartas tapa certo animais",t:"Cartas",q:1},
+  {c:"0129",n:"Trolando",t:"Brinquedo/Lúdico",q:1},
+  {c:"0130",n:"Tangram",t:"Brinquedo/Lúdico",q:2},
+  {c:"0132",n:"Lança água sapinho",t:"Brinquedo/Lúdico",q:1},
+  {c:"0133",n:"Tablet",t:"Brinquedo/Lúdico",q:4},
+  {c:"0134",n:"Mico",t:"Cartas",q:1},
+  {c:"0135",n:"Era uma vez",t:"Cartas",q:1},
+  {c:"0136",n:"Bolinha de gel colorida",t:"Brinquedo/Lúdico",q:33},
+  {c:"0137",n:"Fantasia unicórnio",t:"Brinquedo/Lúdico",q:1},
+  {c:"0138",n:"Fantasia Branca de Neve",t:"Brinquedo/Lúdico",q:1},
+  {c:"0139",n:"Materiais para confecções",t:"Brinquedo/Lúdico",q:1},
+  {c:"0140",n:"Cogumelo didático",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0143",n:"Quem é?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0144",n:"Cuca legal junior",t:"Jogo de Tabuleiro",q:1},
+  {c:"0145",n:"Lince",t:"Brinquedo/Lúdico",q:1},
+  {c:"0146",n:"Trem dominó divertido",t:"Brinquedo/Lúdico",q:1},
+  {c:"0147",n:"Raquete de madeira",t:"Brinquedo/Lúdico",q:2},
+  {c:"0148",n:"Bola didática e colorida",t:"Brinquedo/Lúdico",q:1},
+  {c:"0149",n:"Estacionamento maluco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0150",n:"Anima cubos",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0151",n:"Carro baby",t:"Brinquedo/Lúdico",q:1},
+  {c:"0152",n:"Carrinho Amarelo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0153",n:"Jogo da memória vingadores",t:"Pareamento",q:1},
+  {c:"0154",n:"Tabuleiro Era uma vez",t:"Jogo de Tabuleiro",q:1},
+  {c:"0155",n:"Jogo da linguagem",t:"Jogo de Tabuleiro",q:1},
+  {c:"0156",n:"Figuras para repetir",t:"Cartas",q:1},
+  {c:"0157",n:"Bonecas",t:"Brinquedo/Lúdico",q:2},
+  {c:"0158",n:"Dados brancos de números",t:"Brinquedo/Lúdico",q:2},
+  {c:"0159",n:"Dados fonéticos",t:"Brinquedo/Lúdico",q:11},
+  {c:"0160",n:"Dino papa tudo azul",t:"Brinquedo/Lúdico",q:1},
+  {c:"0161",n:"Caranguejo robô",t:"Brinquedo/Lúdico",q:1},
+  {c:"0162",n:"Animais de Imãs",t:"Brinquedo/Lúdico",q:1},
+  {c:"0163",n:"Jogo do tato",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0164",n:"Descobrindo o alfabeto",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0165",n:"Tapa certo animais",t:"Brinquedo/Lúdico",q:1},
+  {c:"0166",n:"Derruba pinguim",t:"Brinquedo/Lúdico",q:1},
+  {c:"0167",n:"Pista de carrinho infantil",t:"Brinquedo/Lúdico",q:1},
+  {c:"0168",n:"Blocos geométricos",t:"Brinquedo/Lúdico",q:21},
+  {c:"0169",n:"Carrinho de polícia",t:"Brinquedo/Lúdico",q:1},
+  {c:"0170",n:"Pop it",t:"Brinquedo/Lúdico",q:1},
+  {c:"0172",n:"Abrapraxia",t:"Cartas",q:1},
+  {c:"0174",n:"Trenzinho",t:"Brinquedo/Lúdico",q:1},
+  {c:"0175",n:"Pirâmide Didática",t:"Brinquedo/Lúdico",q:1},
+  {c:"0176",n:"Baby posto",t:"Brinquedo/Lúdico",q:1},
+  {c:"0177",n:"Alfabeto carimbo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0178",n:"Tirando de letra",t:"Cartas",q:1},
+  {c:"0179",n:"Fantástica fábrica de histórias",t:"Cartas",q:1},
+  {c:"0180",n:"Abrapraxia (cartas)",t:"Cartas",q:2},
+  {c:"0181",n:"Descobrindo as frases",t:"Cartas",q:1},
+  {c:"0182",n:"Coloque na ordem",t:"Cartas",q:1},
+  {c:"0183",n:"Abremente",t:"Cartas",q:1},
+  {c:"0184",n:"Multi fichas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0185",n:"Cartas de figuras",t:"Cartas",q:1},
+  {c:"0186",n:"Abrapraxia (jogo)",t:"Brinquedo/Lúdico",q:1},
+  {c:"0187",n:"Cartas da boquinha",t:"Cartas",q:1},
+  {c:"0188",n:"Cartas labirinto no campo",t:"Cartas",q:1},
+  {c:"0189",n:"Vê se adivinha",t:"Cartas",q:1},
+  {c:"0190",n:"Lince",t:"Brinquedo/Lúdico",q:1},
+  {c:"0191",n:"Multi Gestos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0192",n:"Inventando Diálogos",t:"Cartas",q:1},
+  {c:"0193",n:"Trio de Rimas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0194",n:"Língua solta",t:"Brinquedo/Lúdico",q:1},
+  {c:"0195",n:"Cuca legal",t:"Brinquedo/Lúdico",q:1},
+  {c:"0196",n:"O que é? O que é?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0197",n:"Casinha animais",t:"Brinquedo/Lúdico",q:1},
+  {c:"0198",n:"Fazendo mímica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0199",n:"Kaleidos Junior",t:"Jogo de Tabuleiro",q:1},
+  {c:"0200",n:"Memória frutas e legumes",t:"Cartas",q:1},
+  {c:"0201",n:"Bola",t:"Brinquedo/Lúdico",q:1},
+  {c:"0204",n:"Memória dos opostos",t:"Cartas",q:1},
+  {c:"0205",n:"Estacionamento maluco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0206",n:"4 em linhas",t:"Brinquedo/Lúdico",q:2},
+  {c:"0207",n:"Soletrar",t:"Brinquedo/Lúdico",q:1},
+  {c:"0208",n:"Jogo do tato",t:"Brinquedo/Lúdico",q:1},
+  {c:"0209",n:"Opostos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0210",n:"Concept",t:"Brinquedo/Lúdico",q:1},
+  {c:"0211",n:"Jogo da cachola",t:"Brinquedo/Lúdico",q:1},
+  {c:"0212",n:"Shape matching game",t:"Brinquedo/Lúdico",q:1},
+  {c:"0213",n:"Cachorro de pelúcia",t:"Brinquedo/Lúdico",q:1},
+  {c:"0214",n:"Fantoches de animais",t:"Brinquedo/Lúdico",q:7},
+  {c:"0215",n:"Alfabeto em blocos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0216",n:"Sr. Cabeça de Batata",t:"Brinquedo/Lúdico",q:1},
+  {c:"0217",n:"Tapete Mágico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0218",n:"Pista de carrinhos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0219",n:"Dinheiro",t:"Brinquedo/Lúdico",q:1},
+  {c:"0220",n:"Carrinhos de borracha",t:"Brinquedo/Lúdico",q:6},
+  {c:"0221",n:"Pista de trem",t:"Brinquedo/Lúdico",q:1},
+  {c:"0222",n:"Animais canetas",t:"Papelaria/Material",q:1},
+  {c:"0223",n:"Ludo",t:"Jogo de Tabuleiro",q:2},
+  {c:"0224",n:"Carro vermelho G",t:"Brinquedo/Lúdico",q:1},
+  {c:"0225",n:"Transportes de imã",t:"Brinquedo/Lúdico",q:1},
+  {c:"0226",n:"Eu sou princesas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0228",n:"Pega pompom",t:"Brinquedo/Lúdico",q:1},
+  {c:"0229",n:"Play-Doh",t:"Brinquedo/Lúdico",q:1},
+  {c:"0230",n:"Estacionamento maluco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0231",n:"Caiu perdeu",t:"Brinquedo/Lúdico",q:1},
+  {c:"0232",n:"Tapa certo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0233",n:"Quadro branco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0234",n:"Quadro de desenvolvimento",t:"Brinquedo/Lúdico",q:1},
+  {c:"0237",n:"Aquaplay Giraffas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0238",n:"Massinha coreles",t:"Papelaria/Material",q:1},
+  {c:"0239",n:"Cata-vento pirulitos",t:"Brinquedo/Lúdico",q:8},
+  {c:"0240",n:"Canudo extrafino",t:"Brinquedo/Lúdico",q:21},
+  {c:"0241",n:"Balões",t:"Brinquedo/Lúdico",q:30},
+  {c:"0242",n:"Abaixador de língua",t:"Brinquedo/Lúdico",q:1},
+  {c:"0243",n:"Canudo preto",t:"Brinquedo/Lúdico",q:17},
+  {c:"0244",n:"Kit cartões Semântico",t:"Brinquedo/Lúdico",q:2},
+  {c:"0245",n:"Kit cartões fonemas",t:"Brinquedo/Lúdico",q:4},
+  {c:"0246",n:"Cartões opostos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0247",n:"Cartões boquinha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0248",n:"Cartões Motricidade Orofacial",t:"Brinquedo/Lúdico",q:1},
+  {c:"0249",n:"Cartões ilustrativos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0250",n:"Pareamento semântico",t:"Pareamento",q:1},
+  {c:"0251",n:"Animal mamãe e bebê",t:"Brinquedo/Lúdico",q:1},
+  {c:"0252",n:"Linguagem Expressiva",t:"Brinquedo/Lúdico",q:1},
+  {c:"0253",n:"Trilha fluência de fala",t:"Brinquedo/Lúdico",q:1},
+  {c:"0254",n:"Abrapraxia 6",t:"Brinquedo/Lúdico",q:2},
+  {c:"0255",n:"Giro mágico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0256",n:"Cubo didático Grande",t:"Brinquedo/Lúdico",q:1},
+  {c:"0257",n:"Aramado Espiral",t:"Brinquedo/Lúdico",q:1},
+  {c:"0259",n:"Bola de pilates",t:"Brinquedo/Lúdico",q:1},
+  {c:"0260",n:"Abrapraxia 1",t:"Brinquedo/Lúdico",q:2},
+  {c:"0261",n:"Fábrica de palavras",t:"Brinquedo/Lúdico",q:1},
+  {c:"0262",n:"Dino papa tudo verde",t:"Brinquedo/Lúdico",q:1},
+  {c:"0264",n:"Tangram",t:"Brinquedo/Lúdico",q:1},
+  {c:"0265",n:"Exploding Kittens",t:"Brinquedo/Lúdico",q:1},
+  {c:"0267",n:"Pareamento de cores",t:"Pareamento",q:1},
+  {c:"0268",n:"Pareamento",t:"Pareamento",q:1},
+  {c:"0269",n:"Figuras Tom e Jerry",t:"Brinquedo/Lúdico",q:1},
+  {c:"0270",n:"Estimuladamente analogias",t:"Brinquedo/Lúdico",q:1},
+  {c:"0271",n:"Estimuladamente categorias",t:"Brinquedo/Lúdico",q:1},
+  {c:"0272",n:"Fichas do Profono",t:"Brinquedo/Lúdico",q:27},
+  {c:"0273",n:"Fichas de labirinto",t:"Brinquedo/Lúdico",q:2},
+  {c:"0276",n:"Reforço PAC cartas",t:"Cartas",q:1},
+  {c:"0277",n:"Figuras de nomeação",t:"Brinquedo/Lúdico",q:2},
+  {c:"0278",n:"Encontra-me",t:"Brinquedo/Lúdico",q:1},
+  {c:"0279",n:"Estimuladamente semelhanças",t:"Brinquedo/Lúdico",q:1},
+  {c:"0280",n:"4 em linha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0281",n:"Tabuleiro de xadrez",t:"Jogo de Tabuleiro",q:1},
+  {c:"0282",n:"Quem é você?",t:"Cartas",q:1},
+  {c:"0283",n:"Mindfulness",t:"Cartas",q:1},
+  {c:"0284",n:"Diga tudo com três palavras",t:"Cartas",q:1},
+  {c:"0285",n:"Exercícios de Autoestima",t:"Cartas",q:1},
+  {c:"0286",n:"Antes e Depois",t:"Cartas",q:1},
+  {c:"0287",n:"Brincando de Mindfulness",t:"Cartas",q:1},
+  {c:"0288",n:"Escrita Terapêutica",t:"Cartas",q:1},
+  {c:"0289",n:"Caixinha Antiansiedade",t:"Cartas",q:1},
+  {c:"0290",n:"Copo Colorido",t:"Brinquedo/Lúdico",q:1},
+  {c:"0291",n:"Formiga nas Calças",t:"Causa e Efeito",q:1},
+  {c:"0293",n:"Conversinha",t:"Cartas",q:1},
+  {c:"0294",n:"Colour code",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0295",n:"Quem procura acha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0296",n:"Roleta das emoções",t:"Cartas",q:1},
+  {c:"0297",n:"Pista de carrinho",t:"Causa e Efeito",q:1},
+  {c:"0299",n:"Raciocínio Jumping",t:"Encaixes/Quebra-cabeça",q:3},
+  {c:"0300",n:"Cartões didáticos infantis",t:"Brinquedo/Lúdico",q:6},
+  {c:"0301",n:"Jogo da memória magnético",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0303",n:"Kit infantil de chá",t:"Brinquedo/Lúdico",q:1},
+  {c:"0304",n:"Brinquedos de comidinha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0305",n:"Mercado em miniatura",t:"Brinquedo/Lúdico",q:1},
+  {c:"0307",n:"Pareamento de pompons",t:"Pareamento",q:1},
+  {c:"0308",n:"Pincéis",t:"Papelaria/Material",q:12},
+  {c:"0309",n:"Lápis de cor",t:"Papelaria/Material",q:11},
+  {c:"0310",n:"Escrita Terapêutica",t:"Cartas",q:1},
+  {c:"0311",n:"Diga tudo com três palavras",t:"Cartas",q:1},
+  {c:"0312",n:"Quem é você",t:"Cartas",q:1},
+  {c:"0313",n:"Exercícios de Autoestima",t:"Cartas",q:1},
+  {c:"0314",n:"Brincando de Mindfulness",t:"Cartas",q:1},
+  {c:"0315",n:"Caixinha Antiansiedade",t:"Cartas",q:1},
+  {c:"0316",n:"Que emoção é esta?",t:"Cartas",q:1},
+  {c:"0317",n:"Organizando as emoções",t:"Cartas",q:1},
+  {c:"0318",n:"Antes e Depois",t:"Cartas",q:1},
+  {c:"0319",n:"Mindfulness",t:"Cartas",q:1},
+  {c:"0320",n:"Garagem de madeira",t:"Brinquedo/Lúdico",q:1},
+  {c:"0323",n:"Uno super-heróis",t:"Cartas",q:1},
+  {c:"0324",n:"Juntar sílabas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0325",n:"Cilada",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0326",n:"Fazendo mímica",t:"Cartas",q:1},
+  {c:"0327",n:"Verdade ou Desafio",t:"Cartas",q:1},
+  {c:"0328",n:"Quadro branco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0329",n:"Caiu perdeu",t:"Brinquedo/Lúdico",q:1},
+  {c:"0330",n:"Mosaico Geométrico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0331",n:"Força pirata",t:"Brinquedo/Lúdico",q:1},
+  {c:"0332",n:"As 4 operações",t:"Brinquedo/Lúdico",q:1},
+  {c:"0333",n:"Cilada",t:"Brinquedo/Lúdico",q:1},
+  {c:"0334",n:"Estacionamento maluco",t:"Brinquedo/Lúdico",q:1},
+  {c:"0335",n:"Letras com imã",t:"Brinquedo/Lúdico",q:25},
+  {c:"0336",n:"Armadilha do pinguim",t:"Brinquedo/Lúdico",q:1},
+  {c:"0337",n:"Vogais",t:"Brinquedo/Lúdico",q:1},
+  {c:"0338",n:"Soletrar",t:"Brinquedo/Lúdico",q:1},
+  {c:"0339",n:"Aprendendo o Alfabeto",t:"Brinquedo/Lúdico",q:1},
+  {c:"0340",n:"Ábaco pedagógico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0341",n:"Torre de Londres",t:"Brinquedo/Lúdico",q:1},
+  {c:"0342",n:"Brincando de Engenheiro",t:"Brinquedo/Lúdico",q:1},
+  {c:"0343",n:"Verdade ou desafio 2",t:"Brinquedo/Lúdico",q:1},
+  {c:"0344",n:"Livros Turma da Mônica",t:"Brinquedo/Lúdico",q:4},
+  {c:"0345",n:"MT moose match mayhem",t:"Brinquedo/Lúdico",q:1},
+  {c:"0346",n:"4 em linha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0347",n:"Cores e formas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0348",n:"Meus 5 sentidos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0349",n:"Cadê o seu pé?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0350",n:"Fazendo mímica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0351",n:"Pista de carrinho infantil",t:"Brinquedo/Lúdico",q:1},
+  {c:"0353",n:"Bingo family club",t:"Brinquedo/Lúdico",q:1},
+  {c:"0355",n:"Kit ferramentas infantil",t:"Brinquedo/Lúdico",q:2},
+  {c:"0356",n:"Qual é a palavra?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0357",n:"Animalucos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0358",n:"Eu conto",t:"Brinquedo/Lúdico",q:1},
+  {c:"0359",n:"Brincando de Mindfulness",t:"Brinquedo/Lúdico",q:1},
+  {c:"0360",n:"Exercícios de autoestima",t:"Brinquedo/Lúdico",q:1},
+  {c:"0361",n:"Quem é você?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0362",n:"Escrita Terapêutica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0363",n:"Diga tudo com três palavras",t:"Brinquedo/Lúdico",q:1},
+  {c:"0364",n:"Caixinha Antiansiedade",t:"Brinquedo/Lúdico",q:1},
+  {c:"0365",n:"Antes e Depois",t:"Brinquedo/Lúdico",q:1},
+  {c:"0366",n:"Kit castelo de areia",t:"Brinquedo/Lúdico",q:1},
+  {c:"0367",n:"Ponte de madeira suspensa",t:"Brinquedo/Lúdico",q:1},
+  {c:"0368",n:"Mosaico Geométrico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0369",n:"Kit salão de beleza masculino",t:"Brinquedo/Lúdico",q:1},
+  {c:"0370",n:"Resposta mágica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0372",n:"Pista de carrinho",t:"Brinquedo/Lúdico",q:1},
+  {c:"0373",n:"Bolsa",t:"Brinquedo/Lúdico",q:1},
+  {c:"0374",n:"Kit chá infantil",t:"Brinquedo/Lúdico",q:1},
+  {c:"0375",n:"Kit mercado infantil",t:"Brinquedo/Lúdico",q:2},
+  {c:"0376",n:"Maleta de médico vermelha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0378",n:"Letras e números em EVA",t:"Brinquedo/Lúdico",q:1},
+  {c:"0379",n:"Banheira de plástico rosa",t:"Brinquedo/Lúdico",q:1},
+  {c:"0380",n:"Boneca da Anna de Frozen",t:"Brinquedo/Lúdico",q:1},
+  {c:"0381",n:"Casa da Barbie",t:"Brinquedo/Lúdico",q:1},
+  {c:"0382",n:"Kit salão de beleza feminino",t:"Brinquedo/Lúdico",q:1},
+  {c:"0384",n:"Boneca Ariel",t:"Brinquedo/Lúdico",q:1},
+  {c:"0385",n:"Kit pareamento cores c/ moedas",t:"Pareamento",q:3},
+  {c:"0386",n:"Quebra-cabeça dinossauros",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0387",n:"Quem é quem?",t:"Brinquedo/Lúdico",q:1},
+  {c:"0388",n:"Pareamento palitos de picolé",t:"Pareamento",q:1},
+  {c:"0389",n:"Cartões de memória",t:"Brinquedo/Lúdico",q:1},
+  {c:"0390",n:"Cartões de associação",t:"Brinquedo/Lúdico",q:1},
+  {c:"0391",n:"Quebra-cabeça com velcro",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0392",n:"Cartões pedagógicos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0393",n:"Associação imagem, cor e nome",t:"Brinquedo/Lúdico",q:1},
+  {c:"0394",n:"Cartas identificação de coisas",t:"Cartas",q:1},
+  {c:"0395",n:"Associação atividades diárias",t:"Brinquedo/Lúdico",q:1},
+  {c:"0396",n:"Kit pareamento cores c/ moedas",t:"Pareamento",q:1},
+  {c:"0397",n:"Boneco visionclop",t:"Brinquedo/Lúdico",q:1},
+  {c:"0398",n:"Fantoche de Papai Noel",t:"Brinquedo/Lúdico",q:1},
+  {c:"0399",n:"Bonecas com roupas",t:"Brinquedo/Lúdico",q:2},
+  {c:"0400",n:"Barbie e Ken",t:"Brinquedo/Lúdico",q:1},
+  {c:"0401",n:"Gorro de Papai Noel",t:"Brinquedo/Lúdico",q:2},
+  {c:"0402",n:"Cones de treinamento",t:"Brinquedo/Lúdico",q:9},
+  {c:"0403",n:"Cesta de palha",t:"Brinquedo/Lúdico",q:2},
+  {c:"0404",n:"Potes redondos coloridos",t:"Brinquedo/Lúdico",q:84},
+  {c:"0405",n:"Cofrinhos dourados",t:"Brinquedo/Lúdico",q:17},
+  {c:"0406",n:"Crachás azuis",t:"Brinquedo/Lúdico",q:9},
+  {c:"0408",n:"Creme adesivo condutivo",t:"Outros",q:3},
+  {c:"0410",n:"Lâmpada spot fenix",t:"Outros",q:4},
+  {c:"0411",n:"Moedas de cores variadas",t:"Brinquedo/Lúdico",q:8},
+  {c:"0412",n:"Lince",t:"Brinquedo/Lúdico",q:1},
+  {c:"0413",n:"Castelo",t:"Brinquedo/Lúdico",q:1},
+  {c:"0438",n:"Segura feijão",t:"Brinquedo/Lúdico",q:1},
+  {c:"0439",n:"Avental",t:"Outros",q:7},
+  {c:"0440",n:"Bandeja multiuso",t:"Outros",q:3},
+  {c:"0441",n:"EVA alfabeto + vogais",t:"Outros",q:1},
+  {c:"0442",n:"Aquarela",t:"Papelaria/Material",q:3},
+  {c:"0444",n:"Bloco de encaixe junior",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0445",n:"Encaixadinhos fazenda",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0446",n:"Encaixadinhos formas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0447",n:"Prancha de seleção 4 colunas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0448",n:"Descobrindo emoções",t:"Outros",q:1},
+  {c:"0449",n:"Livro de colorir labubu",t:"Papelaria/Material",q:3},
+  {c:"0451",n:"Chapéu colorido",t:"Brinquedo/Lúdico",q:3},
+  {c:"0455",n:"Carro f1",t:"Brinquedo/Lúdico",q:2},
+  {c:"0458",n:"Kit beleza",t:"Brinquedo/Lúdico",q:2},
+  {c:"0461",n:"Miniaturas animais selvagens",t:"Brinquedo/Lúdico",q:3},
+  {c:"0464",n:"Trinca de cores",t:"Brinquedo/Lúdico",q:1},
+  {c:"0465",n:"Xalingo quebra-cabeça números",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0466",n:"Xalingo quebra-cabeça AEIOU",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0467",n:"Eu me sinto assim",t:"Brinquedo/Lúdico",q:1},
+  {c:"0468",n:"Xalingo Turma da Mônica",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0469",n:"Animais Incríveis selvagem",t:"Brinquedo/Lúdico",q:1},
+  {c:"0470",n:"Jogo O.V.N.E",t:"Brinquedo/Lúdico",q:1},
+  {c:"0471",n:"Quebra-cabeça aviões velozes",t:"Encaixes/Quebra-cabeça",q:2},
+  {c:"0472",n:"Quebra-cabeça corrida",t:"Encaixes/Quebra-cabeça",q:2},
+  {c:"0473",n:"Quebra-cabeça amigo pet",t:"Encaixes/Quebra-cabeça",q:2},
+  {c:"0474",n:"Quebra-cabeça dinos pré-históricos",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0475",n:"Quebra-cabeça animais/fazenda",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0476",n:"Aqua Pups quebra-cabeça",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0477",n:"Kit banheiro encantado",t:"Brinquedo/Lúdico",q:1},
+  {c:"0480",n:"Kit quarto encantado",t:"Brinquedo/Lúdico",q:1},
+  {c:"0481",n:"Quebra-cabeça baby safari",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0482",n:"Quebra-cabeça dinos baby",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0483",n:"Quebra-cabeça floresta animada",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0484",n:"Batalha naval",t:"Jogo de Tabuleiro",q:1},
+  {c:"0485",n:"Capivara quebra-cabeça",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0486",n:"Palavras cruzadas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0487",n:"Puxa batatinha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0488",n:"Hora ilustrada",t:"Encaixes/Quebra-cabeça",q:2},
+  {c:"0489",n:"Tucano",t:"Brinquedo/Lúdico",q:1},
+  {c:"0490",n:"Aprenda as horas brincando",t:"Brinquedo/Lúdico",q:1},
+  {c:"0491",n:"Xalingo truques e mágica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0493",n:"Baby Mix",t:"Brinquedo/Lúdico",q:1},
+  {c:"0498",n:"Penico",t:"Brinquedo/Lúdico",q:2},
+  {c:"0502",n:"Bebê-conforto",t:"Brinquedo/Lúdico",q:3},
+  {c:"0503",n:"Tábua de passar roupa",t:"Brinquedo/Lúdico",q:2},
+  {c:"0504",n:"Áqua brink",t:"Brinquedo/Lúdico",q:1},
+  {c:"0505",n:"Caminha",t:"Brinquedo/Lúdico",q:1},
+  {c:"0508",n:"Passando roupinha de princesa",t:"Brinquedo/Lúdico",q:1},
+  {c:"0510",n:"Aspirador de pó",t:"Brinquedo/Lúdico",q:1},
+  {c:"0511",n:"Boneca Babys Bambola Papa",t:"Brinquedo/Lúdico",q:1},
+  {c:"0512",n:"George Peppa Pig",t:"Brinquedo/Lúdico",q:2},
+  {c:"0516",n:"Super Mercadinho",t:"Brinquedo/Lúdico",q:2},
+  {c:"0517",n:"Secador",t:"Brinquedo/Lúdico",q:5},
+  {c:"0518",n:"Kit Beleza",t:"Brinquedo/Lúdico",q:5},
+  {c:"0519",n:"Chapinha",t:"Brinquedo/Lúdico",q:4},
+  {c:"0522",n:"Ioiô Luz Princesas",t:"Brinquedo/Lúdico",q:2},
+  {c:"0523",n:"Mamadeira mágica",t:"Brinquedo/Lúdico",q:1},
+  {c:"0526",n:"Baby Alive Piniquinho Mágico",t:"Brinquedo/Lúdico",q:1},
+  {c:"0529",n:"Jogo da memória Princesas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0530",n:"Cores e Formas memória",t:"Brinquedo/Lúdico",q:1},
+  {c:"0531",n:"Memória Adão e Eva",t:"Brinquedo/Lúdico",q:1},
+  {c:"0532",n:"Memória Dinossauros",t:"Brinquedo/Lúdico",q:1},
+  {c:"0533",n:"Jogo da boa memória",t:"Brinquedo/Lúdico",q:1},
+  {c:"0534",n:"Quebra-cabeça corpo humano",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0535",n:"Quebra-cabeça Princesas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0536",n:"Quebra-cabeça Peppa Pig",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0581",n:"Lousa Mágica Tablet",t:"Brinquedo/Lúdico",q:2},
+  {c:"0582",n:"Top Game 9000 jogos",t:"Brinquedo/Lúdico",q:1},
+  {c:"0583",n:"Minhas letras magnéticas",t:"Brinquedo/Lúdico",q:1},
+  {c:"0585",n:"Girababy com blocos e números",t:"Brinquedo/Lúdico",q:1},
+  {c:"0586",n:"Encaixes Montessori madeira",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0589",n:"Quebra-cabeça planetas",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0590",n:"Quebra-cabeça meios de transporte",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0591",n:"Encaixe dupla de cãezinhos",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0592",n:"Encaixe sapinho",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0593",n:"Encaixe navio rosa",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0594",n:"Encaixe foguete",t:"Encaixes/Quebra-cabeça",q:1},
+  {c:"0595",n:"Encaixe carrinho de polícia",t:"Encaixes/Quebra-cabeça",q:1},
+];
+
+const itens = TODOS.filter(i=>{
+  if(BLOQUEADOS_TIPOS.includes(i.t)) return false;
+  const n=i.n.toLowerCase();
+  return !BLOQUEADOS_PARCIAL.some(b=>n.includes(b));
+});
+
+const estoque={};
+itens.forEach(i=>{estoque[i.c]=i.q;});
+const cart={};
+let catAtiva="Todos";
+let cartOpen=false;
+
+const TIPOS=["Todos",...new Set(itens.map(i=>i.t))].sort((a,b)=>a==="Todos"?-1:a.localeCompare(b));
+
+function pillClass(t){
+  const m={"Cartas":"cartas","Encaixes/Quebra-cabeça":"encaixe","Jogo de Tabuleiro":"tabuleiro","Pareamento":"pareamento","Causa e Efeito":"causa","Papelaria/Material":"papelaria","Outros":"outros"};
+  return m[t]||"";
+}
+
+function renderCats(){
+  document.getElementById("cats").innerHTML=TIPOS.map(t=>
+    `<button class="cat-btn${t===catAtiva?" active":""}" onclick="setCat('${t.replace(/'/g,"\\'")}')">
+      ${t==="Todos"?"Todos":t}
+    </button>`
+  ).join("");
+}
+
+function setCat(t){catAtiva=t;renderGrid();renderCats();}
+
+function renderGrid(){
+  const b=document.getElementById("busca").value.toLowerCase();
+  const f=itens.filter(i=>{
+    const mc=catAtiva==="Todos"||i.t===catAtiva;
+    const mb=!b||i.n.toLowerCase().includes(b)||i.c.includes(b);
+    return mc&&mb;
+  });
+  const g=document.getElementById("grid");
+  if(!f.length){g.innerHTML='<div class="no-res">Nenhum recurso encontrado 🔍</div>';return;}
+  g.innerHTML=f.map(i=>{
+    const sel=cart[i.c]>0;
+    const esg=estoque[i.c]<=0&&!sel;
+    return `<div class="item-card${sel?" selected":""}${esg?" esgotado":""}" id="card-${i.c}" onclick="toggleItem(event,'${i.c}')">
+      <div class="chk"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <span class="tipo-pill ${pillClass(i.t)}">${i.t}</span>
+      <div class="nome">${i.n}</div>
+      <div class="disp">Disponível: <b id="disp-${i.c}">${estoque[i.c]}</b></div>
+      <div class="qty-row" onclick="event.stopPropagation()">
+        <button class="qty-btn" onclick="changeQty('${i.c}',-1)">−</button>
+        <span class="qty-val" id="qty-${i.c}">${cart[i.c]||0}</span>
+        <button class="qty-btn" onclick="changeQty('${i.c}',1)">+</button>
+      </div>
+    </div>`;
+  }).join("");
+  atualizaTotal();
+}
+
+function atualizaTotal(){
+  const t=itens.reduce((s,i)=>s+estoque[i.c],0);
+  document.getElementById("total-disp").textContent=t;
+}
+
+function toggleItem(e,cod){
+  if(e.target.tagName==="BUTTON"||e.target.tagName==="POLYLINE") return;
+  if(estoque[cod]<=0&&!(cart[cod]>0)) return;
+  if(cart[cod]>0){estoque[cod]+=cart[cod];cart[cod]=0;}
+  else{cart[cod]=1;estoque[cod]--;}
+  renderGrid();renderCartBar();
+}
+
+function changeQty(cod,d){
+  const cur=cart[cod]||0;
+  const novo=cur+d;
+  if(novo<1){estoque[cod]+=cur;cart[cod]=0;renderGrid();renderCartBar();return;}
+  const item=itens.find(i=>i.c===cod);
+  if(d>0&&estoque[cod]<=0){toast("Sem estoque disponível!");return;}
+  if(d>0&&novo>item.q){toast("Quantidade máxima atingida!");return;}
+  estoque[cod]-=d;cart[cod]=novo;
+  const qEl=document.getElementById("qty-"+cod);
+  const dEl=document.getElementById("disp-"+cod);
+  if(qEl)qEl.textContent=novo;
+  if(dEl)dEl.textContent=estoque[cod];
+  atualizaTotal();
+  renderCartBar();
+}
+
+function renderCartBar(){
+  const keys=Object.keys(cart).filter(k=>cart[k]>0);
+  const count=keys.length;
+  const badge=document.getElementById("cart-badge");
+  badge.textContent=count;
+  badge.className=count>0?"cart-badge":"cart-badge hidden";
+  updateConfirm();
+  const body=document.getElementById("cart-body");
+  if(!count){body.innerHTML='<div class="cart-empty">Nenhum recurso selecionado ainda.</div>';return;}
+  body.innerHTML=keys.map(k=>{
+    const it=itens.find(i=>i.c===k);
+    return `<div class="cart-item">
+      <div class="ci-nome">${it.n} <span class="ci-cod">#${k}</span></div>
+      <span class="ci-qty">${cart[k]}×</span>
+      <button class="ci-rem" onclick="removeItem('${k}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+  }).join("");
+}
+
+function removeItem(cod){estoque[cod]+=cart[cod];cart[cod]=0;renderGrid();renderCartBar();}
+
+function clearCart(){
+  Object.keys(cart).forEach(k=>{if(cart[k]>0){estoque[k]+=cart[k];cart[k]=0;}});
+  renderGrid();renderCartBar();
+}
+
+function toggleCart(){
+  cartOpen=!cartOpen;
+  document.getElementById("cart-body").className="cart-body"+(cartOpen?" open":"");
+  document.getElementById("cart-arrow").textContent=cartOpen?"▼ fechar":"▲ ver lista";
+}
+
+function updateConfirm(){
+  const prof=document.getElementById("profissional").value;
+  const hasItems=Object.values(cart).some(v=>v>0);
+  document.getElementById("btn-confirm").disabled=!prof||!hasItems;
+}
+
+function abrirModal(){
+  const prof=document.getElementById("profissional").value;
+  const now=new Date();
+  const data=now.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  const hora=now.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  document.getElementById("modal-prof").textContent=prof;
+  document.getElementById("modal-data").textContent=data+" · "+hora;
+  const keys=Object.keys(cart).filter(k=>cart[k]>0);
+  const totalQty=keys.reduce((s,k)=>s+cart[k],0);
+  document.getElementById("modal-total").textContent=totalQty+" unidade"+(totalQty!==1?"s":"");
+  document.getElementById("modal-tbody").innerHTML=keys.map(k=>{
+    const it=itens.find(i=>i.c===k);
+    return `<tr><td>${it.n}</td><td style="color:var(--muted);font-size:12px">#${k}</td><td style="text-align:right;font-weight:600;color:var(--verde)">${cart[k]}</td></tr>`;
+  }).join("");
+  document.getElementById("modal").className="modal-overlay open";
+}
+
+function fecharModal(){document.getElementById("modal").className="modal-overlay";}
+
+function enviarWhatsApp(){
+  const prof=document.getElementById("profissional").value;
+  const now=new Date();
+  const data=now.toLocaleDateString("pt-BR");
+  const hora=now.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const keys=Object.keys(cart).filter(k=>cart[k]>0);
+  let msg=`🧠 *CIENAH – Retirada de Recursos*\n`;
+  msg+=`📋 *Profissional:* ${prof}\n`;
+  msg+=`📅 *Data/Hora:* ${data} às ${hora}\n\n`;
+  msg+=`*Recursos retirados:*\n`;
+  keys.forEach(k=>{
+    const it=itens.find(i=>i.c===k);
+    msg+=`• ${it.n} (#${k}) — ${cart[k]}×\n`;
+  });
+  msg+=`\n_CIENAH · Centro Interdisciplinar Especializado em Neurociência e Atendimento Humanizado_`;
+  window.open("https://wa.me/556391252929?text="+encodeURIComponent(msg),"_blank");
+}
+
+function imprimirPDF(){
+  const prof=document.getElementById("profissional").value;
+  const now=new Date();
+  const data=now.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  const hora=now.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const keys=Object.keys(cart).filter(k=>cart[k]>0);
+  const totalQty=keys.reduce((s,k)=>s+cart[k],0);
+  const rows=keys.map(k=>{
+    const it=itens.find(i=>i.c===k);
+    return `<tr><td>${it.n}</td><td style="color:#666;font-size:12px">#${k}</td><td style="text-align:center;font-weight:600;color:#054F6F">${cart[k]}</td></tr>`;
+  }).join("");
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Comprovante CIENAH</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;padding:32px;color:#1a2332;font-size:13px}
+    .hdr{background:#054F6F;color:#fff;padding:20px 24px;border-radius:10px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center}
+    .hdr h1{font-size:18px;font-weight:700}
+    .hdr p{font-size:11px;opacity:.8;margin-top:3px}
+    .hdr-right{text-align:right;font-size:12px;opacity:.9}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+    .info-box{background:#f7f9fa;border-radius:8px;padding:12px 14px;border:1px solid #e2e8f0}
+    .info-box label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+    .info-box span{font-size:14px;font-weight:600}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f1f5f9;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px}
+    td{padding:10px 10px;border-bottom:1px solid #f1f5f9}
+    tfoot td{font-weight:700;background:#eef6fb;color:#054F6F}
+    .footer{margin-top:28px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:16px}
+    .assinatura{margin-top:40px;display:flex;justify-content:space-around}
+    .assin-box{text-align:center;width:200px}
+    .assin-box .linha{border-top:1px solid #1a2332;padding-top:6px;margin-top:40px;font-size:11px;color:#64748b}
+    @media print{body{padding:20px}.hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style></head><body>
+  <div class="hdr">
+    <div><h1>🧠 CIENAH</h1><p>Centro Interdisciplinar Especializado em Neurociência e Atendimento Humanizado</p></div>
+    <div class="hdr-right"><div style="font-size:16px;font-weight:700">Comprovante de Retirada</div><div>${data}</div></div>
+  </div>
+  <div class="info-grid">
+    <div class="info-box"><label>Profissional</label><span>${prof}</span></div>
+    <div class="info-box"><label>Horário</label><span>${hora}</span></div>
+    <div class="info-box"><label>Total de tipos</label><span>${keys.length} recurso${keys.length!==1?"s":""}</span></div>
+    <div class="info-box"><label>Total de unidades</label><span>${totalQty} unidade${totalQty!==1?"s":""}</span></div>
+  </div>
+  <table>
+    <thead><tr><th>Recurso</th><th>Código</th><th style="text-align:center">Qtd</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="2">Total</td><td style="text-align:center">${totalQty}</td></tr></tfoot>
+  </table>
+  <div class="assinatura">
+    <div class="assin-box"><div class="linha">Assinatura do Profissional</div></div>
+    <div class="assin-box"><div class="linha">Responsável pelo Acervo</div></div>
+  </div>
+  <div class="footer">CIENAH · (63) 9 9125-2929 · cienahpalmas@gmail.com · @cienahpalmas · www.cienah.com.br<br>
+  Documento gerado em ${data} às ${hora}</div>
+  <script>setTimeout(()=>window.print(),400);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg;t.className="toast show";
+  setTimeout(()=>t.className="toast",2500);
+}
+
+renderCats();renderGrid();renderCartBar();
+</script>
+</body>
+</html>
